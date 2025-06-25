@@ -126,24 +126,23 @@ const trabajoSocialSeleccionadoRoutes = require('./routes/trabajoSocialSeleccion
 app.use('/api/trabajo-social', trabajoSocialSeleccionadoRoutes);
 
 
-// Sincronizar la base de datos y luego iniciar el servidor
 const syncDatabase = async () => {
   try {
-    // Sincroniza los modelos con la base de datos
-    await Roles.sync({ alter: true });
-    await Usuario.sync({ alter: true });
-    await TrabajoComunitario.sync({ alter: true });
-    await Notificacion.sync({ alter: true });
-    await Infraccion.sync({ alter: true });
-    await Validacion.sync({ alter: true });
-    await ProgramasAcademicos.sync({ alter: true });
-    await Docentes.sync({ alter: true });
-    await LaboresSociales.sync({ alter: true });
-    await TrabajoSocialSeleccionado.sync({ alter: true });
-    await Facultades.sync({ alter: true });
-    await CronogramaActividad.sync({ alter: true });
-    await IntegranteGrupo.sync({ alter: true });
-    await Estudiantes.sync({ alter: true });
+    
+    await Roles.sync();
+    await Usuario.sync();
+    await TrabajoComunitario.sync();
+    await Notificacion.sync();
+    await Infraccion.sync();
+    await Validacion.sync();
+    await ProgramasAcademicos.sync();
+    await Docentes.sync();
+    await LaboresSociales.sync();
+    await TrabajoSocialSeleccionado.sync();
+    await Facultades.sync();
+    await CronogramaActividad.sync();
+    await IntegranteGrupo.sync();
+    await Estudiantes.sync();
     console.log('Base de datos sincronizada correctamente');
     
     // Iniciar el servidor
