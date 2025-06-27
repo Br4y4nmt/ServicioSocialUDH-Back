@@ -4,16 +4,14 @@ const LaboresSociales = require('./LaboresSociales');
 const Usuario = require('./Usuario');
 const Roles = require('./Roles');
 const TrabajoSocialSeleccionado = require('./TrabajoSocialSeleccionado');
-const TrabajoComunitario = require('./TrabajoComunitario');
 const Notificacion = require('./Notificacion');
-const Validacion = require('./Validacion');
 const LineaDeAccion = require('./LineaDeAccion'); 
 const CartaTermino = require('./CartaTermino'); 
 const Facultades = require('./Facultades');
-const CartaAceptacion = require('./CartaAceptacion'); // 👈 nuevo modelo
+const CartaAceptacion = require('./CartaAceptacion'); 
 const Estudiantes = require('./Estudiantes');
 const CronogramaActividad = require('./CronogramaActividad');
-const IntegranteGrupo = require('./IntegranteGrupo'); // ✅ nuevo modelo
+const IntegranteGrupo = require('./IntegranteGrupo'); 
 
 Roles.hasMany(Usuario, { foreignKey: 'rol_id' });
 Usuario.belongsTo(Roles, { foreignKey: 'rol_id' });
@@ -48,9 +46,6 @@ TrabajoSocialSeleccionado.belongsTo(Docentes, { foreignKey: 'docente_id' });
 LaboresSociales.hasMany(TrabajoSocialSeleccionado, { foreignKey: 'labor_social_id' });
 TrabajoSocialSeleccionado.belongsTo(LaboresSociales, { foreignKey: 'labor_social_id' });
 
-Usuario.hasMany(TrabajoComunitario, { foreignKey: 'usuario_id' });
-TrabajoComunitario.belongsTo(Usuario, { foreignKey: 'usuario_id' });
-
 ProgramasAcademicos.hasMany(Docentes, { foreignKey: 'programa_academico_id' });
 Docentes.belongsTo(ProgramasAcademicos, { foreignKey: 'programa_academico_id' });
 
@@ -66,8 +61,6 @@ LineaDeAccion.hasMany(TrabajoSocialSeleccionado, {
   as: 'trabajosSociales'
 });
 
-
-TrabajoComunitario.belongsTo(Usuario, { as: 'gestor', foreignKey: 'gestor_id' });
 
 Usuario.hasMany(Notificacion, { foreignKey: 'usuario_id' });
 Notificacion.belongsTo(Usuario, { foreignKey: 'usuario_id' });
@@ -142,14 +135,12 @@ module.exports = {
   Docentes,
   LaboresSociales,
   Roles,
-  TrabajoComunitario,
   TrabajoSocialSeleccionado,
   CronogramaActividad,
   Notificacion,
-  Validacion,
   Facultades,
   IntegranteGrupo,
   LineaDeAccion,
   CartaAceptacion,
-  CartaTermino// ✅ exportar el nuevo modelo
+  CartaTermino
 };

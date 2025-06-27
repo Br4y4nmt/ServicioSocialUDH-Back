@@ -32,7 +32,6 @@ router.post('/',
       // 🔄 ACTUALIZAR el campo primera_vez a false
       const usuario = await Usuario.findByPk(id_usuario);
       if (usuario && usuario.primera_vez === true) {
-        console.log('Actualizando primera_vez de usuario', usuario.id_usuario);
         usuario.primera_vez = false;
         await usuario.save({ fields: ['primera_vez'] });
       }

@@ -9,10 +9,7 @@ const sequelize = require('./config/database');
 // Modelos
 const Roles = require('./models/Roles');
 const Usuario = require('./models/Usuario');
-const Validacion = require('./models/Validacion');
-const TrabajoComunitario = require('./models/TrabajoComunitario');
 const Notificacion = require('./models/Notificacion');
-const Infraccion = require('./models/Infracciones');
 const CartaAceptacion = require('./models/CartaAceptacion');
 const CartaTermino = require('./models/CartaTermino');
 const LineaDeAccion = require('./models/LineaDeAccion');
@@ -22,11 +19,7 @@ const CronogramaActividad = require('./models/CronogramaActividad');
 const Docentes = require('./models/Docentes');
 const LaboresSociales = require('./models/LaboresSociales');
 const TrabajoSocialSeleccionado = require('./models/TrabajoSocialSeleccionado');
-// ✅ Deja el modelo así como está:
 const IntegranteGrupo = require('./models/IntegranteGrupo');
-
-
-
 const Facultades = require('./models/Facultades');
 const app = express();
 
@@ -68,11 +61,8 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
 const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
 
-const infraccionRoutes = require('./routes/infracciones');
-app.use('/api/infracciones', infraccionRoutes);
 
-// Rutas de Facultades (Renombrado para evitar el conflicto)
-const facultadesRoutes = require('./routes/facultades');  // Renombrado de infraccionRoutes a facultadesRoutes
+const facultadesRoutes = require('./routes/facultades');  
 app.use('/api/facultades', facultadesRoutes);
 
 const lineaDeAccionRoutes = require('./routes/lineaDeAccion');
@@ -92,9 +82,6 @@ const cartasAceptacionRoutes = require('./routes/cartasAceptacion');
 app.use('/api/cartas-aceptacion', cartasAceptacionRoutes);
 
 
-const trabajoRoutes = require('./routes/trabajos');
-app.use('/api/trabajos-comunitarios', trabajoRoutes);
-
 const cartasTerminoRoutes = require('./routes/cartasTermino'); // ✅ correcto
 app.use('/api/cartas-termino', cartasTerminoRoutes);
 
@@ -105,11 +92,6 @@ app.use('/api/cronograma', cronogramaRoutes);
 const integrantesGrupoRoutes = require('./routes/integrantesGrupo');
 app.use('/api/integrantes', integrantesGrupoRoutes);
 
-const comprobanteRoutes = require('./routes/comprobante');
-app.use('/api/comprobantes', comprobanteRoutes);
-
-const validacionRoutes = require('./routes/validacion');
-app.use('/api/validacion', validacionRoutes);
 
 const laboresSocialesRoutes = require('./routes/laboresSociales');
 app.use('/api/labores', laboresSocialesRoutes);
@@ -118,9 +100,6 @@ app.use('/api/labores', laboresSocialesRoutes);
 const estudiantesRoutes = require('./routes/estudiantes');
 app.use('/api/estudiantes', estudiantesRoutes);
 
-
-const comprobantesRoutes = require('./routes/comprobantes');
-app.use('/api/comprobantes', comprobantesRoutes);
 
 const trabajoSocialSeleccionadoRoutes = require('./routes/trabajoSocialSeleccionadoRoutes');
 app.use('/api/trabajo-social', trabajoSocialSeleccionadoRoutes);
@@ -131,10 +110,7 @@ const syncDatabase = async () => {
     
     await Roles.sync();
     await Usuario.sync();
-    await TrabajoComunitario.sync();
     await Notificacion.sync();
-    await Infraccion.sync();
-    await Validacion.sync();
     await ProgramasAcademicos.sync();
     await Docentes.sync();
     await LaboresSociales.sync();

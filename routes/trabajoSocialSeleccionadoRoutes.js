@@ -659,7 +659,7 @@ router.get('/informes-finales/programa/:programa_academico_id',
         {
         model: Facultades,
         as: 'Facultad',
-        attributes: ['nombre_facultad'] // 👈 agregado
+        attributes: ['nombre_facultad'] 
       }
       ],
       attributes: [
@@ -667,7 +667,7 @@ router.get('/informes-finales/programa/:programa_academico_id',
       'informe_final_pdf',
       'estado_informe_final',
       'createdAt',
-      'certificado_final' // ✅ <--- AGREGA ESTA LÍNEA
+      'certificado_final' 
     ]
     });
 

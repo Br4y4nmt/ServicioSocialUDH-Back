@@ -129,28 +129,6 @@ router.get('/:id_usuario',
   }
 });
 
-// Ruta para actualizar el monto acumulado del usuario
-router.put('/:id_usuario/monto-acumulado', async (req, res) => {
-  const { id_usuario } = req.params;
-  const { monto } = req.body;
-
-  try {
-    const usuario = await Usuario.findByPk(id_usuario);
-    if (!usuario) {
-      return res.status(404).json({ message: 'Usuario no encontrado' });
-    }
-
-    // Sumar el monto al monto acumulado actual
-    usuario.monto_acumulado += parseFloat(monto);
-    await usuario.save();
-
-    res.status(200).json({ message: 'Monto acumulado actualizado correctamente' });
-  } catch (error) {
-    console.error('Error al actualizar el monto acumulado del usuario:', error);
-    res.status(500).json({ message: 'Error al actualizar el monto acumulado' });
-  }
-});
-
 router.get('/:id_usuario/primera-vez', async (req, res) => {
   try {
     const usuario = await Usuario.findByPk(req.params.id_usuario);

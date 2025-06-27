@@ -26,16 +26,9 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 router.get('/perfil', authMiddleware, async (req, res) => {
-  console.log('📥 Endpoint /perfil INVOCADO');
+
   try {
-    // 1) Ver lo que llega del token
-    console.log('🔑 Token → req.user:', req.user);          // { id: 116, rol: ... }
-
-    // 2) ID que se usará en la búsqueda
-    const idUsuario = req.user.id;                          // 116
-    console.log('🔍 Buscando docente con id_usuario =', idUsuario);
-
-    // 3) Consulta: usa el atributo "id_usuario"
+    const idUsuario = req.user.id;                   
     const docente = await Docentes.findOne({
       where: { id_usuario: idUsuario },
       attributes: ['dni', 'celular', 'facultad_id', 'programa_academico_id'],
@@ -50,8 +43,6 @@ router.get('/perfil', authMiddleware, async (req, res) => {
       console.warn('⚠️  Docente NO encontrado para id_usuario:', idUsuario);
       return res.status(404).json({ message: 'Docente no encontrado' });
     }
-
-    console.log('✅ Docente encontrado:', docente.toJSON());
 
     // 5) Respuesta
     res.json({
