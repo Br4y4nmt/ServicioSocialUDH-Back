@@ -14,26 +14,39 @@ const verificarRol = require('../middlewares/verificarRol');
 
 // Registro de usuarios
 router.post('/register', async (req, res) => {
-  const { email, dni, whatsapp } = req.body;
+  const { email, dni, whatsapp, codigo } = req.body;
 
   try {
-    if (!email || !dni || !whatsapp) {
+    if (!email || !dni || !whatsapp || !codigo) {
       return res.status(400).json({ message: 'Faltan datos requeridos' });
     }
 
-    // Verificar si el email ya está registrado
+    // 1. Verificar si el código es real consultando el API externo
+    const resUDH = await axios.get(`http://www.udh.edu.pe/websauh/secretaria_general/gradosytitulos/datos_estudiante_json.aspx?_c_3456=${codigo}`);
+    const data = resUDH.data[0];
+
+    if (!data) {
+      return res.status(400).json({ message: 'Código inválido o no encontrado' });
+    }
+
+    // 2. Verificar si el estudiante está en el ciclo 7 o superior
+    if (data.stu_ciclo < 7) {
+      return res.status(400).json({ message: 'Solo pueden registrarse estudiantes del ciclo 7 o superior' });
+    }
+
+    // 3. Verificar si el email ya está registrado
     const existingUser = await Usuario.findOne({ where: { email } });
     if (existingUser) {
       return res.status(409).json({ message: 'El correo ya está registrado' });
     }
 
-    // Asignar rol por defecto si existe "transportista"
+    // 4. Asignar rol por defecto si existe "alumno"
     const rolAlumno = await Roles.findOne({ where: { nombre_rol: 'alumno' } });
-      if (!rolAlumno) {
-        return res.status(500).json({ message: 'No se encontró el rol de alumno' });
-      }
+    if (!rolAlumno) {
+      return res.status(500).json({ message: 'No se encontró el rol de alumno' });
+    }
 
-    // Crear el usuario
+    // 5. Crear el usuario
     const nuevoUsuario = await Usuario.create({
       email,
       dni,

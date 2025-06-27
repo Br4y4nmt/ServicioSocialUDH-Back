@@ -25,7 +25,7 @@ const app = express();
 
 // Configuración de CORS
 const corsOptions = {
-  origin: 'http://localhost:3000',  // O la URL de tu frontend
+  origin: 'https://servicio-social.sistemasudh.com',  // O la URL de tu frontend
   methods: ['GET', 'POST', 'PUT', 'DELETE','PATCH'],  // Métodos permitidos
   allowedHeaders: ['Content-Type', 'Authorization'],  // Encabezados permitidos
   credentials: true,  // Permite el envío de cookies y autenticación
@@ -40,7 +40,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-        'frame-ancestors': ["'self'", 'http://localhost:3000'],
+        'frame-ancestors': ["'self'", 'https://servicio-social.sistemasudh.com'],
       },
     },
   })
@@ -52,7 +52,7 @@ app.use(express.json());
 // Servir la carpeta de archivos subidos
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
   setHeaders: (res) => {
-    res.set('Access-Control-Allow-Origin', '*'); // o tu frontend: http://localhost:3000
+    res.set('Access-Control-Allow-Origin', '*'); 
     res.set('Cross-Origin-Resource-Policy', 'cross-origin');
   }
 }));
