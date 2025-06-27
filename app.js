@@ -25,14 +25,15 @@ const app = express();
 
 // Configuración de CORS
 const corsOptions = {
-  origin: 'https://servicio-social.sistemasudh.com',  // O la URL de tu frontend
+  origin: 'https://servicio-social.sistemasudh.com', 
+  //origin: 'http://localhost:3000', // O la URL de tu frontend
   methods: ['GET', 'POST', 'PUT', 'DELETE','PATCH'],  // Métodos permitidos
   allowedHeaders: ['Content-Type', 'Authorization'],  // Encabezados permitidos
   credentials: true,  // Permite el envío de cookies y autenticación
 };
 app.use(cors(corsOptions));  // Usa esta configuración de CORS
 
-// Configuración de Helmet con políticas de seguridad
+
 app.use(
   helmet({
     crossOriginOpenerPolicy: false,
@@ -45,7 +46,6 @@ app.use(
     },
   })
 );
-
 // Middleware para parsear JSON en las solicitudes
 app.use(express.json());
 

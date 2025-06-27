@@ -6,7 +6,34 @@ const Usuario = require('../models/Usuario');
 const Facultades = require('../models/Facultades');
 const authMiddleware = require('../middlewares/authMiddleware');
 const verificarRol = require('../middlewares/verificarRol');
-// Crear nuevo estudiante
+const axios = require('axios'); // Asegúrate de que esta línea esté presente
+
+router.get('/perfil-estudiante/:correo', async (req, res) => {
+  const { correo } = req.params;
+  const codigoDesdeCorreo = correo.split('@')[0]; // Extraemos el código del correo
+
+  try {
+    // Hacer la solicitud HTTP a la API externa de UDH
+    const response = await axios.get(`http://www.udh.edu.pe/websauh/secretaria_general/gradosytitulos/datos_estudiante_json.aspx?_c_3456=${codigoDesdeCorreo}`);
+
+    const data = response.data[0];
+
+    const nombre_completo = `${data.stu_nombres || ''} ${data.stu_apellido_paterno || ''} ${data.stu_apellido_materno || ''}`.trim();
+
+    // Retornar los datos al frontend
+    res.json({
+      nombre_completo,
+      dni: data.stu_dni || '',
+      codigo: data.stu_codigo || '',
+      facultad: data.stu_facultad || '',
+      programa: data.stu_programa || '',
+      correo,
+    });
+  } catch (error) {
+    console.error('Error al obtener los datos del estudiante:', error);
+    res.status(500).json({ message: 'Error al obtener los datos del estudiante' });
+  }
+});
 router.post('/',
   authMiddleware,
   verificarRol('gestor-udh', 'programa-academico', 'alumno'),
