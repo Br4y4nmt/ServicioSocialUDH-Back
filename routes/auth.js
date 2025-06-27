@@ -11,6 +11,7 @@ const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const router = express.Router();
 const authMiddleware = require('../middlewares/authMiddleware'); 
 const verificarRol = require('../middlewares/verificarRol');  
+import axios from 'axios'; 
 
 // Registro de usuarios
 router.post('/register', async (req, res) => {
