@@ -794,8 +794,8 @@ router.get('/documentos-trabajo/:id', async (req, res) => {
       return res.status(404).json({ message: 'Archivo PDF no existe en el servidor' });
     }
 
-    // Si el archivo existe, lo manda al navegador
-    res.sendFile(rutaPDF);
+     res.setHeader('Content-Disposition', `inline; filename="carta_aceptacion_${id}.pdf"`);
+     res.sendFile(rutaPDF);
 
   } catch (error) {
     console.error('Error al servir el PDF:', error);

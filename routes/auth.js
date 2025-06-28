@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const jwt = require('jsonwebtoken');
 const sequelize = require('../config/database').sequelize;
-const { ProgramasAcademicos, Facultades, Usuario, Docentes, Roles } = require('../models');
+const { ProgramasAcademicos, Estudiantes, Facultades, Usuario, Docentes, Roles } = require('../models');
 const { Op } = require('sequelize'); 
 const { OAuth2Client } = require('google-auth-library');
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -13,16 +13,15 @@ const authMiddleware = require('../middlewares/authMiddleware');
 const verificarRol = require('../middlewares/verificarRol');  
 const axios = require('axios');
 
-// Registro de usuarios
 router.post('/register', async (req, res) => {
-  const { email, dni, whatsapp, codigo } = req.body;
+  const { codigo, dni, whatsapp } = req.body;
 
   try {
-    if (!email || !dni || !whatsapp || !codigo) {
+    if (!codigo || !dni || !whatsapp) {
       return res.status(400).json({ message: 'Faltan datos requeridos' });
     }
 
-    // 1. Verificar si el código es real consultando el API externo
+    // 1. Consultar la API externa para obtener los datos del estudiante
     const resUDH = await axios.get(`http://www.udh.edu.pe/websauh/secretaria_general/gradosytitulos/datos_estudiante_json.aspx?_c_3456=${codigo}`);
     const data = resUDH.data[0];
 
@@ -35,36 +34,56 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'Solo pueden registrarse estudiantes del ciclo 7 o superior' });
     }
 
-    // 3. Verificar si el email ya está registrado
-    const existingUser = await Usuario.findOne({ where: { email } });
+    // 3. Verificar si el correo ya está registrado
+    const existingUser = await Usuario.findOne({ where: { email: `${codigo}@udh.edu.pe` } });
     if (existingUser) {
       return res.status(409).json({ message: 'El correo ya está registrado' });
     }
 
-    // 4. Asignar rol por defecto si existe "alumno"
-    const rolAlumno = await Roles.findOne({ where: { nombre_rol: 'alumno' } });
-    if (!rolAlumno) {
-      return res.status(500).json({ message: 'No se encontró el rol de alumno' });
+    // 4. Obtener el ID de la facultad por nombre
+    const facultad = await Facultades.findOne({
+      where: { nombre_facultad: data.stu_facultad.trim() } // Comparando el nombre de la facultad
+    });
+
+    if (!facultad) {
+      return res.status(400).json({ message: 'Facultad no encontrada' });
     }
 
-    // 5. Crear el usuario
+    // 5. Obtener el ID del programa académico por nombre
+    const programa = await ProgramasAcademicos.findOne({
+      where: { nombre_programa: data.stu_programa.trim(), id_facultad: facultad.id_facultad } // Comparando el nombre del programa y facultad
+    });
+
+    if (!programa) {
+      return res.status(400).json({ message: 'Programa académico no encontrado' });
+    }
+
+    // 6. Crear el usuario en la tabla Usuario
     const nuevoUsuario = await Usuario.create({
-      email,
+      email: `${codigo}@udh.edu.pe`,
       dni,
       whatsapp,
-      password: '', // vacío si no se usa en este flujo
-      rol_id: rolAlumno.id_rol
+      password: '', // Vacío si no se usa
+      rol_id: 3 // Asignando rol por defecto (ajustar según sea necesario)
     });
 
-    res.status(201).json({
-      message: 'Usuario registrado correctamente',
+    // 7. Crear el registro en la tabla Estudiantes
+    await Estudiantes.create({
+      nombre_estudiante: `${data.stu_nombres} ${data.stu_apellido_paterno} ${data.stu_apellido_materno}`,
+      dni,
+      email: `${codigo}@udh.edu.pe`,
+      celular: whatsapp,
+      facultad_id: facultad.id_facultad,  // Asignando el ID de la facultad
+      programa_academico_id: programa.id_programa,  // Asignando el ID del programa académico
       id_usuario: nuevoUsuario.id_usuario,
-      email: nuevoUsuario.email
+      codigo: data.stu_codigo
     });
+
+    res.status(201).json({ message: 'Usuario y estudiante registrados correctamente' });
 
   } catch (error) {
-    console.error('Error registrando usuario:', error);
-    res.status(500).json({ message: 'Error registrando usuario', error: error.message });
+    console.error('Error registrando usuario y estudiante:', error);
+    res.status(500).json({ message: 'Error registrando usuario y estudiante', error: error.message });
   }
 });
 

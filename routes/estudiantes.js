@@ -34,6 +34,40 @@ router.get('/perfil-estudiante/:correo', async (req, res) => {
     res.status(500).json({ message: 'Error al obtener los datos del estudiante' });
   }
 });
+router.get('/usuario/:id_usuario',
+  authMiddleware,
+  verificarRol('alumno'),
+  async (req, res) => {
+    const { id_usuario } = req.params;
+    try {
+      const estudiante = await Estudiantes.findOne({
+        where: { id_usuario },
+        include: [
+          {
+            model: ProgramasAcademicos,
+            as: 'programa',
+            attributes: ['nombre_programa']
+          },
+          {
+            model: Facultades,
+            as: 'facultad',
+            attributes: ['nombre_facultad']
+          }
+        ]
+      });
+
+      if (!estudiante) {
+        return res.status(404).json({ message: 'Estudiante no encontrado' });
+      }
+
+      res.status(200).json(estudiante);
+    } catch (error) {
+      console.error('Error al obtener estudiante:', error);
+      res.status(500).json({ error: 'Error del servidor' });
+    }
+  });
+
+
 router.post('/',
   authMiddleware,
   verificarRol('gestor-udh', 'programa-academico', 'alumno'),
@@ -88,7 +122,6 @@ router.get('/',
     res.status(500).json({ message: 'Error al obtener estudiantes', error });
   }
 });
-
 // Obtener estudiante por ID
 router.get('/:id_estudiante',
   authMiddleware,
@@ -209,10 +242,12 @@ router.get('/datos/usuario/:usuario_id',
         include: [
           {
             model: ProgramasAcademicos,
+            as: 'programa', // ← alias correcto
             attributes: ['nombre_programa']
           },
           {
             model: Facultades,
+            as: 'facultad', // ← alias correcto
             attributes: ['nombre_facultad']
           }
         ]
@@ -228,8 +263,29 @@ router.get('/datos/usuario/:usuario_id',
       res.status(500).json({ message: 'Error al obtener datos del estudiante', error });
     }
 });
+router.put('/actualizar-celular-perfil/:usuario_id',
+  authMiddleware,
+  verificarRol('alumno', 'gestor-udh', 'programa-academico'),
+  async (req, res) => {
+    try {
+      const { usuario_id } = req.params;
+      const { celular } = req.body;
 
-  // PUT /api/estudiantes/actualizar-celular/:usuario_id
+      const estudiante = await Estudiantes.findOne({ where: { id_usuario: usuario_id } });
+
+      if (!estudiante) {
+        return res.status(404).json({ message: 'Estudiante no encontrado' });
+      }
+
+      await estudiante.update({ celular });
+
+      res.status(200).json({ message: 'Celular actualizado correctamente' });
+    } catch (error) {
+      console.error('Error al actualizar celular:', error);
+      res.status(500).json({ message: 'Error al actualizar celular', error });
+    }
+  });
+
 router.put('/actualizar-celular/:usuario_id',
   authMiddleware,
   verificarRol('alumno', 'gestor-udh', 'programa-academico'),
@@ -237,18 +293,27 @@ router.put('/actualizar-celular/:usuario_id',
     try {
       const { usuario_id } = req.params;
       const { celular } = req.body;
-  
+
       const estudiante = await Estudiantes.findOne({ where: { id_usuario: usuario_id } });
-  
+
       if (!estudiante) {
         return res.status(404).json({ message: 'Estudiante no encontrado' });
       }
-  
+
       await estudiante.update({ celular });
+
+      // 🔁 Actualizar primera_vez en tabla usuarios
+      const usuario = await Usuario.findByPk(usuario_id);
+      if (usuario && usuario.primera_vez === true) {
+        usuario.primera_vez = false;
+        await usuario.save({ fields: ['primera_vez'] });
+      }
+
       res.status(200).json({ message: 'Celular actualizado correctamente' });
     } catch (error) {
       console.error('Error al actualizar celular:', error);
       res.status(500).json({ message: 'Error al actualizar celular', error });
     }
-  });
+  }
+);
 module.exports = router;

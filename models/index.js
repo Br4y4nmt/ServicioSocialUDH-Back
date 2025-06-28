@@ -77,7 +77,10 @@ TrabajoSocialSeleccionado.belongsTo(Facultades, {
 Facultades.hasMany(TrabajoSocialSeleccionado, { foreignKey: 'facultad_id' });
 
 // Relación entre Estudiantes y Facultades
-Estudiantes.belongsTo(Facultades, { foreignKey: 'facultad_id' });
+Estudiantes.belongsTo(Facultades, {
+  foreignKey: 'facultad_id',
+  as: 'facultad'
+});
 Facultades.hasMany(Estudiantes, { foreignKey: 'facultad_id' });
 
 ProgramasAcademicos.belongsTo(Usuario, { foreignKey: 'usuario_id' });
@@ -88,7 +91,10 @@ Estudiantes.belongsTo(Usuario, { foreignKey: 'id_usuario' });
 Usuario.hasMany(Estudiantes, { foreignKey: 'id_usuario' });
 
 // Relación entre Estudiantes y ProgramasAcademicos
-Estudiantes.belongsTo(ProgramasAcademicos, { foreignKey: 'programa_academico_id' });
+Estudiantes.belongsTo(ProgramasAcademicos, {
+  foreignKey: 'programa_academico_id',
+  as: 'programa'
+});
 ProgramasAcademicos.hasMany(Estudiantes, { foreignKey: 'programa_academico_id' });
 
 // Relación entre TrabajoSocialSeleccionado y Estudiantes (para acceder al nombre del alumno)
