@@ -210,10 +210,19 @@ router.get('/por-programa/:usuario_id',
     const docentes = await Docentes.findAll({
       where: { programa_academico_id: programa.id_programa },
       include: [
-        { model: ProgramasAcademicos, attributes: ['nombre_programa'] },
-        { model: Facultades, attributes: ['nombre_facultad'] }
+        {
+          model: ProgramasAcademicos,
+          as: 'ProgramaDelDocente', // ✅ alias correcto
+          attributes: ['nombre_programa']
+        },
+        {
+          model: Facultades,
+          as: 'Facultade', // ✅ alias correcto
+          attributes: ['nombre_facultad']
+        }
       ]
     });
+
 
     res.status(200).json(docentes);
   } catch (error) {

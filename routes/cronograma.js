@@ -3,6 +3,8 @@ const router = express.Router();
 const upload = require('../middlewares/multerConfig');
 const { CronogramaActividad, TrabajoSocialSeleccionado } = require('../models');
 const authMiddleware = require('../middlewares/authMiddleware');
+const path = require('path');
+const fs = require('fs');
 const verificarRol = require('../middlewares/verificarRol');
 // Obtener cronograma por usuario
 router.get('/:usuario_id',
@@ -197,6 +199,38 @@ router.get('/trabajo/:trabajo_social_id',
     res.status(500).json({ message: 'Error al obtener cronograma' });
   }
 });
+router.delete('/evidencia/:actividad_id',
+  authMiddleware,
+  verificarRol('alumno'),
+  async (req, res) => {
+    const { actividad_id } = req.params;
+
+    try {
+      const actividad = await CronogramaActividad.findByPk(actividad_id);
+      if (!actividad) {
+        return res.status(404).json({ message: 'Actividad no encontrada' });
+      }
+
+      // Verificamos si hay evidencia previa
+      if (actividad.evidencia) {
+        const rutaArchivo = path.join(__dirname, '..', 'uploads', 'evidencias', actividad.evidencia);
+        if (fs.existsSync(rutaArchivo)) {
+          fs.unlinkSync(rutaArchivo); // Elimina del sistema de archivos
+        }
+        // Limpiar campos de evidencia en la base de datos
+        actividad.evidencia = null;
+        actividad.fecha_fin = null;
+        actividad.estado = null;
+        await actividad.save();
+      }
+
+      res.json({ message: 'Evidencia eliminada correctamente' });
+    } catch (error) {
+      console.error('Error al eliminar evidencia:', error);
+      res.status(500).json({ message: 'Error al eliminar evidencia' });
+    }
+  }
+);
 router.patch('/:id/observacion',
   authMiddleware,
   verificarRol('docente supervisor', 'gestor-udh', 'programa-academico'),
