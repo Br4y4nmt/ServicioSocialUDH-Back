@@ -13,6 +13,7 @@ const Notificacion = require('./models/Notificacion');
 const CartaAceptacion = require('./models/CartaAceptacion');
 const CartaTermino = require('./models/CartaTermino');
 const LineaDeAccion = require('./models/LineaDeAccion');
+const CertificadoFinalMiembro = require('./models/CertificadoFinalMiembro');
 const ProgramasAcademicos = require('./models/ProgramasAcademicos');
 const Estudiantes = require('./models/Estudiantes');
 const CronogramaActividad = require('./models/CronogramaActividad');
@@ -78,6 +79,10 @@ app.use('/api/docentes', docentesRoutes);
 const usuariosRoutes = require('./routes/usuarios');
 app.use('/api/usuarios', usuariosRoutes);
 
+const certificadosFinalMiembrosRoutes = require('./routes/certificadosFinalMiembros');
+app.use('/api/certificados-final', certificadosFinalMiembrosRoutes);
+
+
 const cartasAceptacionRoutes = require('./routes/cartasAceptacion');
 app.use('/api/cartas-aceptacion', cartasAceptacionRoutes);
 
@@ -116,6 +121,7 @@ const syncDatabase = async () => {
     await LaboresSociales.sync();
     await TrabajoSocialSeleccionado.sync();
     await Facultades.sync();
+    await CertificadoFinalMiembro.sync();
     await CronogramaActividad.sync();
     await IntegranteGrupo.sync();
     await Estudiantes.sync();

@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { IntegranteGrupo, TrabajoSocialSeleccionado } = require('../models');
+const { IntegranteGrupo, TrabajoSocialSeleccionado, Usuario} = require('../models');
 const authMiddleware = require('../middlewares/authMiddleware');
 const verificarRol = require('../middlewares/verificarRol');
-
+const { getDatosAcademicosUDH } = require('../services/udhService');
 router.post('/',
   authMiddleware,
   verificarRol('alumno', 'gestor-udh'),
@@ -85,4 +85,75 @@ router.get('/estudiante/actual',
     res.status(500).json({ message: 'Error del servidor' });
   }
 });
+
+
+router.get('/:trabajo_social_id/enriquecido',
+  authMiddleware,
+  verificarRol('docente supervisor', 'gestor-udh', 'programa-academico'),
+  async (req, res) => {
+    try {
+      const { trabajo_social_id } = req.params;
+
+      // 1. Buscar el trabajo social
+      const trabajo = await TrabajoSocialSeleccionado.findOne({
+        where: { id: trabajo_social_id }
+      });
+
+      if (!trabajo) {
+        return res.status(404).json({ message: 'Trabajo social no encontrado' });
+      }
+
+      // 2. Si es individual, buscar correo del usuario
+      if (trabajo.tipo_servicio_social === 'individual') {
+        const usuario = await Usuario.findOne({
+          where: { id: trabajo.usuario_id }
+        });
+
+        if (!usuario || !usuario.correo_institucional) {
+          return res.status(404).json({ message: 'Usuario no tiene correo institucional' });
+        }
+
+        const codigo = usuario.correo_institucional.split('@')[0];
+        const datos = await getDatosAcademicosUDH(codigo);
+
+        return res.json([{
+          usuario_id: usuario.id,
+          correo_institucional: usuario.correo_institucional,
+          codigo_universitario: codigo,
+          ...datos
+        }]);
+      }
+
+      // 3. Si es grupal, obtener los correos de integrantes
+      const integrantes = await IntegranteGrupo.findAll({
+        where: { trabajo_social_id },
+        attributes: ['correo_institucional']
+      });
+
+      if (!integrantes.length) {
+        return res.status(404).json({ message: 'No hay integrantes registrados' });
+      }
+
+      const resultados = await Promise.all(
+        integrantes.map(async (i) => {
+          const correo = i.correo_institucional;
+          const codigo = correo.split('@')[0];
+          const datos = await getDatosAcademicosUDH(codigo);
+
+          return {
+            correo_institucional: correo,
+            codigo_universitario: codigo,
+            ...datos
+          };
+        })
+      );
+
+      res.json(resultados.filter(r => r !== null));
+    } catch (error) {
+      console.error('❌ Error en enriquecido:', error);
+      res.status(500).json({ message: 'Error del servidor' });
+    }
+  }
+);
+
 module.exports = router;

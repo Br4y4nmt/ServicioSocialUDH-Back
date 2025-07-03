@@ -3,6 +3,7 @@ const Docentes = require('./Docentes');
 const LaboresSociales = require('./LaboresSociales');
 const Usuario = require('./Usuario');
 const Roles = require('./Roles');
+const CertificadoFinalMiembro = require('./CertificadoFinalMiembro');
 const TrabajoSocialSeleccionado = require('./TrabajoSocialSeleccionado');
 const Notificacion = require('./Notificacion');
 const LineaDeAccion = require('./LineaDeAccion'); 
@@ -48,6 +49,17 @@ TrabajoSocialSeleccionado.belongsTo(LaboresSociales, { foreignKey: 'labor_social
 
 ProgramasAcademicos.hasMany(Docentes, { foreignKey: 'programa_academico_id' });
 Docentes.belongsTo(ProgramasAcademicos, { foreignKey: 'programa_academico_id' });
+
+// 🔗 Relación entre TrabajoSocialSeleccionado y CertificadoFinalMiembro
+TrabajoSocialSeleccionado.hasMany(CertificadoFinalMiembro, {
+  foreignKey: 'trabajo_id',
+  as: 'certificadosFinales'
+});
+
+CertificadoFinalMiembro.belongsTo(TrabajoSocialSeleccionado, {
+  foreignKey: 'trabajo_id',
+  as: 'trabajo'
+});
 
 // Un trabajo social pertenece a una línea de acción
 TrabajoSocialSeleccionado.belongsTo(LineaDeAccion, {
@@ -148,5 +160,6 @@ module.exports = {
   IntegranteGrupo,
   LineaDeAccion,
   CartaAceptacion,
-  CartaTermino
+  CartaTermino,
+  CertificadoFinalMiembro
 };

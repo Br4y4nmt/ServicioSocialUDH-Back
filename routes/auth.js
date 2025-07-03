@@ -21,9 +21,14 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'Faltan datos requeridos' });
     }
 
-    // 1. Consultar la API externa para obtener los datos del estudiante
-    const resUDH = await axios.get(`http://www.udh.edu.pe/websauh/secretaria_general/gradosytitulos/datos_estudiante_json.aspx?_c_3456=${codigo}`);
-    const data = resUDH.data[0];
+    let data;
+    try {
+      const resUDH = await axios.get(`http://www.udh.edu.pe/websauh/secretaria_general/gradosytitulos/datos_estudiante_json.aspx?_c_3456=${codigo}`, { timeout: 7000 });
+      data = resUDH.data[0];
+    } catch (error) {
+      console.error('❌ Error conectando con la API de UDH:', error.message);
+      return res.status(503).json({ message: 'El servidor de UDH no está disponible. Intenta más tarde.' });
+    }
 
     if (!data) {
       return res.status(400).json({ message: 'Código inválido o no encontrado' });
