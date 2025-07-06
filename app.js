@@ -124,10 +124,10 @@ const syncDatabase = async () => {
     await CertificadoFinalMiembro.sync();
     await CronogramaActividad.sync();
     await IntegranteGrupo.sync();
-    await Estudiantes.sync();
+    await Estudiantes.sync({ alter: true });
     console.log('Base de datos sincronizada correctamente');
     
-    // Iniciar el servidor
+ 
     const PORT = process.env.PORT || 5000;
     app.listen(PORT, () => {
       console.log(`Servidor escuchando en el puerto ${PORT}`);

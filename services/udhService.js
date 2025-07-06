@@ -19,7 +19,7 @@ const getDatosAcademicosUDH = async (codigo) => {
     };
   } catch (error) {
     console.error(`❌ Error con código ${codigo}:`, error.message);
-    return null; // fallback si falla
+    return null; 
   }
 };
 

@@ -49,6 +49,18 @@ Estudiantes.init({
     type: DataTypes.STRING(15),
     allowNull: false,
   },
+  sede: {
+  type: DataTypes.ENUM('HUÁNUCO', 'LEONCIO PRADO'),
+  allowNull: true,
+  defaultValue: null,
+  },
+
+  modalidad: {
+    type: DataTypes.ENUM('PRESENCIAL', 'SEMI-PRESENCIAL'),
+    allowNull: true,
+    defaultValue: null
+  },
+
   id_usuario: {
     type: DataTypes.INTEGER,
     allowNull: false,

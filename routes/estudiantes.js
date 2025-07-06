@@ -83,14 +83,13 @@ router.post('/',
         nombre_estudiante,
         dni,
         email,
-        codigo, // ✅ aquí el nuevo campo
+        codigo, 
         facultad_id: facultad,
         programa_academico_id,
         celular,
         id_usuario,
       });
-  
-      // 🔄 ACTUALIZAR el campo primera_vez a false
+
       const usuario = await Usuario.findByPk(id_usuario);
       if (usuario && usuario.primera_vez === true) {
         usuario.primera_vez = false;
@@ -292,7 +291,7 @@ router.put('/actualizar-celular/:usuario_id',
   async (req, res) => {
     try {
       const { usuario_id } = req.params;
-      const { celular } = req.body;
+      const { celular, sede, modalidad } = req.body;
 
       const estudiante = await Estudiantes.findOne({ where: { id_usuario: usuario_id } });
 
@@ -300,7 +299,23 @@ router.put('/actualizar-celular/:usuario_id',
         return res.status(404).json({ message: 'Estudiante no encontrado' });
       }
 
-      await estudiante.update({ celular });
+      // ✅ Validación de sede
+      if (sede && !['HUÁNUCO', 'LEONCIO PRADO'].includes(sede)) {
+        return res.status(400).json({ message: 'Sede inválida' });
+      }
+
+      // ✅ Validación de modalidad
+      if (modalidad && !['PRESENCIAL', 'SEMI-PRESENCIAL'].includes(modalidad)) {
+        return res.status(400).json({ message: 'Modalidad inválida' });
+      }
+
+      // ✅ Campos a actualizar
+      const camposActualizados = {};
+      if (celular) camposActualizados.celular = celular;
+      if (sede !== undefined) camposActualizados.sede = sede;
+      if (modalidad !== undefined) camposActualizados.modalidad = modalidad.toUpperCase();
+
+      await estudiante.update(camposActualizados);
 
       // 🔁 Actualizar primera_vez en tabla usuarios
       const usuario = await Usuario.findByPk(usuario_id);
@@ -309,11 +324,14 @@ router.put('/actualizar-celular/:usuario_id',
         await usuario.save({ fields: ['primera_vez'] });
       }
 
-      res.status(200).json({ message: 'Celular actualizado correctamente' });
+      res.status(200).json({ message: 'Datos actualizados correctamente' });
+
     } catch (error) {
-      console.error('Error al actualizar celular:', error);
-      res.status(500).json({ message: 'Error al actualizar celular', error });
+      console.error('Error al actualizar datos:', error);
+      res.status(500).json({ message: 'Error al actualizar datos', error });
     }
   }
 );
+
+
 module.exports = router;
