@@ -13,13 +13,7 @@ const Estudiantes = require('../models/Estudiantes');
 const Facultades = require('../models/Facultades'); 
 const LineaDeAccion = require('../models/LineaDeAccion'); 
 
-function asegurarDirectorioExiste(ruta) {
-  const dirCompleto = path.join(__dirname, '..', ruta);
-  if (!fs.existsSync(dirCompleto)) {
-    fs.mkdirSync(dirCompleto, { recursive: true });
-  }
-  return dirCompleto;
-}
+
 const storageCertificadoFinal = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, 'uploads/certificados_finales');
@@ -86,13 +80,19 @@ const storageArchivoPlan = multer.diskStorage({
   // 📂 Nueva configuración para guardar carta de término
 const storageCartaTermino = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, asegurarDirectorioExiste('uploads/cartas_termino')); // ✅ Verifica y crea
+    const dir = path.join(__dirname, '../uploads/cartas_termino');
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true }); // ✅ CREA la carpeta si no existe
+    }
+    cb(null, dir); // ✅ Ruta absoluta
   },
   filename: function (req, file, cb) {
     const uniqueName = `carta_termino_${Date.now()}${path.extname(file.originalname)}`;
     cb(null, uniqueName);
   }
 });
+
+
 // 📄 Configuración para guardar el informe final
 const storageInformeFinal = multer.diskStorage({
   destination: function (req, file, cb) {
