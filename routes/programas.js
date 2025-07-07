@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { Op } = require('sequelize'); 
 const Facultades = require('../models/Facultades');
 const Usuarios = require('../models/Usuario');
 const ProgramasAcademicos = require('../models/ProgramasAcademicos');  // Importa el modelo de Programas Académicos
@@ -10,51 +11,69 @@ router.post('/',
   authMiddleware,
   verificarRol('gestor-udh'),
   async (req, res) => {
-  const { nombre_programa, id_facultad, email, whatsapp } = req.body;
+    const { nombre_programa, id_facultad, email, whatsapp } = req.body;
 
-  try {
-    // ✅ Asegurarse que el dni no sea cadena vacía (por si más adelante quieres usarlo)
-    const dni = req.body.dni && req.body.dni.trim() !== '' ? req.body.dni.trim() : null;
+    try {
+      // Validaciones básicas
+      if (!nombre_programa || !id_facultad || !email || !whatsapp) {
+        return res.status(400).json({ message: 'Todos los campos son obligatorios' });
+      }
 
-    // 1. Crear primero el usuario
-    const nuevoUsuario = await Usuarios.create({
-      email,
-      whatsapp,
-      rol_id: 4,         // Rol fijo para programa académico
-      dni,               // Puede ser null
-      primera_vez: true
-    });
+      // Validar formato de email permitido
+      const emailValido = /@(udh\.edu\.pe|gmail\.com)$/.test(email);
+      if (!emailValido) {
+        return res.status(400).json({
+          message: 'El correo debe ser @udh.edu.pe o @gmail.com'
+        });
+      }
 
-    // 2. Luego crear el programa académico con el ID del usuario recién creado
-    const nuevoPrograma = await ProgramasAcademicos.create({
-      nombre_programa,
-      id_facultad,
-      email,
-      usuario_id: nuevoUsuario.id_usuario
-    });
+      // Verificar si el correo ya está registrado
+      const usuarioExistente = await Usuarios.findOne({ where: { email } });
+      if (usuarioExistente) {
+        return res.status(409).json({ message: 'El correo ya está registrado' });
+      }
 
-    res.status(201).json({
-      message: 'Programa y usuario creados exitosamente',
-      programa: nuevoPrograma,
-      usuario: nuevoUsuario
-    });
+      // Crear usuario
+      const dni = req.body.dni && req.body.dni.trim() !== '' ? req.body.dni.trim() : null;
+      const nuevoUsuario = await Usuarios.create({
+        email,
+        whatsapp,
+        rol_id: 4, // Rol fijo para programa académico
+        dni,
+        primera_vez: true
+      });
 
-  }catch (error) {
-  console.error('Error al crear registros:', error);
+      // Crear programa académico
+      const nuevoPrograma = await ProgramasAcademicos.create({
+        nombre_programa,
+        id_facultad,
+        email,
+        usuario_id: nuevoUsuario.id_usuario
+      });
 
-  if (error.name === 'SequelizeUniqueConstraintError') {
-    // extrae qué campo falló
-    const campoDuplicado = error?.errors[0]?.path;
-    const valor = error?.errors[0]?.value;
+      res.status(201).json({
+        message: 'Programa y usuario creados exitosamente',
+        programa: nuevoPrograma,
+        usuario: nuevoUsuario
+      });
 
-    return res.status(400).json({
-      message: `El valor '${valor}' ya está registrado en el campo '${campoDuplicado}'`
-    });
-  }
+    } catch (error) {
+      console.error('Error al crear registros:', error);
 
-  res.status(500).json({ message: 'Error en la creación de registros', error });
-}
-});
+      if (error.name === 'SequelizeUniqueConstraintError') {
+        const campo = error?.errors[0]?.path;
+        const valor = error?.errors[0]?.value;
+        return res.status(400).json({
+          message: `El valor '${valor}' ya está registrado en el campo '${campo}'`
+        });
+      }
+
+      res.status(500).json({
+        message: 'Error en la creación de registros',
+        error: error.message
+      });
+    }
+  });
 
 
 router.get('/',
@@ -93,25 +112,54 @@ router.get('/:id_programa',
   }
 });
 
-// Actualizar un programa académico
 router.put('/:id_programa',
   authMiddleware,
   verificarRol('gestor-udh'),
   async (req, res) => {
-  try {
-    const programa = await ProgramasAcademicos.findByPk(req.params.id_programa);
-    if (programa) {
+    try {
+      const programa = await ProgramasAcademicos.findByPk(req.params.id_programa);
+
+      if (!programa) {
+        return res.status(404).json({ message: 'Programa académico no encontrado' });
+      }
+
       const { nombre_programa, id_facultad, email } = req.body;
+
+      // Validar si el email está en uso por otro usuario
+      if (email) {
+        const usuarioExistente = await Usuarios.findOne({
+          where: {
+            email,
+            id_usuario: { [Op.ne]: programa.usuario_id }
+          }
+        });
+
+        if (usuarioExistente) {
+          return res.status(409).json({
+            message: 'El correo ya está registrado por otro usuario.'
+          });
+        }
+      }
+
+      // Actualizar programa académico
       await programa.update({ nombre_programa, id_facultad, email });
-      res.status(200).json(programa);
-    } else {
-      res.status(404).json({ message: 'Programa académico no encontrado' });
+
+      // Actualizar email en tabla usuarios si corresponde
+      if (programa.usuario_id && email) {
+        const usuario = await Usuarios.findByPk(programa.usuario_id);
+        if (usuario) {
+          await usuario.update({ email });
+        }
+      }
+
+      res.status(200).json({ message: 'Programa y usuario actualizados correctamente' });
+
+    } catch (error) {
+      console.error('Error al actualizar programa académico y usuario:', error);
+      res.status(500).json({ message: 'Error al actualizar programa académico', error: error.message });
     }
-  } catch (error) {
-    console.error('Error al actualizar programa académico:', error);
-    res.status(500).json({ message: 'Error al actualizar programa académico', error });
   }
-});
+);
 
 // Eliminar un programa académico
 router.delete('/:id_programa',

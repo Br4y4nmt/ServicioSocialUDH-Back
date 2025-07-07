@@ -124,7 +124,7 @@ const syncDatabase = async () => {
     await CertificadoFinalMiembro.sync();
     await CronogramaActividad.sync();
     await IntegranteGrupo.sync();
-    await Estudiantes.sync({ alter: true });
+    await Estudiantes.sync();
     console.log('Base de datos sincronizada correctamente');
     
  

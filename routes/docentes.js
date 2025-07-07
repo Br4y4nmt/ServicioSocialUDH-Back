@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { Op } = require('sequelize');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -230,25 +231,62 @@ router.get('/por-programa/:usuario_id',
     res.status(500).json({ message: 'Error interno al filtrar docentes', error });
   }
 });
-// Actualizar un docente
 router.put('/:id_docente',
   authMiddleware,
   verificarRol('gestor-udh', 'programa-academico'),
   async (req, res) => {
-  try {
-    const docente = await Docentes.findByPk(req.params.id_docente);
-    if (docente) {
-      const { nombre_docente, programa_academico_id, facultad_id } = req.body;
-      await docente.update({ nombre_docente, programa_academico_id, facultad_id }); // ✅ incluir facultad_id
-      res.status(200).json(docente);
-    } else {
-      res.status(404).json({ message: 'Docente no encontrado' });
+    try {
+      const docente = await Docentes.findByPk(req.params.id_docente);
+
+      if (!docente) {
+        return res.status(404).json({ message: 'Docente no encontrado' });
+      }
+
+      const { nombre_docente, programa_academico_id, facultad_id, email } = req.body;
+
+      // Validar si el nuevo correo ya está en uso por otro usuario
+      if (email) {
+        const usuarioExistente = await Usuario.findOne({ // <-- CORREGIDO
+          where: {
+            email,
+            id_usuario: { [Op.ne]: docente.id_usuario }
+          }
+        });
+
+        if (usuarioExistente) {
+          return res.status(409).json({
+            message: 'El correo ya está registrado por otro usuario.'
+          });
+        }
+      }
+
+      // ✅ Actualizar DOCENTE
+      await docente.update({
+        nombre_docente,
+        programa_academico_id,
+        facultad_id,
+        email
+      });
+
+      // ✅ Actualizar USUARIO
+      if (email && docente.id_usuario) {
+        const usuario = await Usuario.findByPk(docente.id_usuario);
+        if (usuario) {
+          await usuario.update({ email });
+        }
+      }
+
+      res.status(200).json({ message: 'Docente y usuario actualizados correctamente' });
+
+    } catch (error) {
+      console.error('Error al actualizar docente y usuario:', error);
+      res.status(500).json({ message: 'Error al actualizar docente y usuario', error });
     }
-  } catch (error) {
-    console.error('Error al actualizar docente:', error);
-    res.status(500).json({ message: 'Error al actualizar docente', error });
   }
-});
+);
+
+
+
 
 // Eliminar un docente
 router.delete('/:id_docente',

@@ -357,7 +357,57 @@ router.post('/register-docente', async (req, res) => {
   }
 });
 
+router.post('/registrar-docente-completo', async (req, res) => {
+  const { email, dni, whatsapp, facultad_id, programa_academico_id } = req.body;
 
+  try {
+    if (!email || !dni || !whatsapp || !facultad_id || !programa_academico_id) {
+      return res.status(400).json({ message: 'Faltan campos requeridos' });
+    }
+
+    // Verificar si el email ya está registrado
+    const existente = await Usuario.findOne({ where: { email } });
+    if (existente) {
+      return res.status(409).json({ message: 'El correo ya está registrado' });
+    }
+
+    // Buscar el rol de docente supervisor
+    const rolDocente = await Roles.findOne({ where: { nombre_rol: 'docente supervisor' } });
+    if (!rolDocente) {
+      return res.status(500).json({ message: 'No se encontró el rol de docente' });
+    }
+
+    // Crear usuario
+    const nuevoUsuario = await Usuario.create({
+      email,
+      dni,
+      whatsapp,
+      rol_id: rolDocente.id_rol,
+      password: '',
+      primera_vez: true
+    });
+
+    // Crear docente
+    const nuevoDocente = await Docentes.create({
+      email,
+      dni,
+      celular: whatsapp,
+      facultad_id,
+      programa_academico_id,
+      id_usuario: nuevoUsuario.id_usuario
+    });
+
+    res.status(201).json({
+      message: 'Docente y usuario creados correctamente',
+      docente: nuevoDocente,
+      usuario: nuevoUsuario
+    });
+
+  } catch (error) {
+    console.error('Error creando docente y usuario:', error);
+    res.status(500).json({ message: 'Error en el servidor', error: error.message });
+  }
+});
 
 
 
