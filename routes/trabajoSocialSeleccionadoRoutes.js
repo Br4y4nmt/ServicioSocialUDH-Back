@@ -7,14 +7,19 @@ const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 const TrabajoSocialSeleccionado = require('../models/TrabajoSocialSeleccionado');
-// Asegúrate de importar el modelo ProgramasAcademicos correctamente
 const ProgramasAcademicos = require('../models/ProgramasAcademicos');
 const LaboresSociales = require('../models/LaboresSociales');
 const Estudiantes = require('../models/Estudiantes');
-const Facultades = require('../models/Facultades'); // asegúrate de que el path esté bien
+const Facultades = require('../models/Facultades'); 
 const LineaDeAccion = require('../models/LineaDeAccion'); 
 
-
+function asegurarDirectorioExiste(ruta) {
+  const dirCompleto = path.join(__dirname, '..', ruta);
+  if (!fs.existsSync(dirCompleto)) {
+    fs.mkdirSync(dirCompleto, { recursive: true });
+  }
+  return dirCompleto;
+}
 const storageCertificadoFinal = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, 'uploads/certificados_finales');
@@ -81,7 +86,7 @@ const storageArchivoPlan = multer.diskStorage({
   // 📂 Nueva configuración para guardar carta de término
 const storageCartaTermino = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/cartas_termino');
+    cb(null, asegurarDirectorioExiste('uploads/cartas_termino')); // ✅ Verifica y crea
   },
   filename: function (req, file, cb) {
     const uniqueName = `carta_termino_${Date.now()}${path.extname(file.originalname)}`;
@@ -783,7 +788,7 @@ router.post('/guardar-carta-termino-html',
     }
 
     await trabajo.update({
-      carta_termino_pdf: req.file.filename // 👈 este campo debe existir en tu modelo
+      carta_termino_pdf: req.file.filename 
     });
 
     res.status(200).json({
