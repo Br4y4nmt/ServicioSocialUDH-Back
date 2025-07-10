@@ -1,7 +1,7 @@
 const { Model, DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
-const ProgramasAcademicos = require('./ProgramasAcademicos');  // Importa el modelo de programas académicos
-const Facultades = require('./Facultades');  // Importa el modelo de facultades
+const ProgramasAcademicos = require('./ProgramasAcademicos');  
+const Facultades = require('./Facultades'); 
 
 class Docentes extends Model {}
 
@@ -17,13 +17,13 @@ Docentes.init({
   },
   dni: {
     type: DataTypes.STRING(8),
-    allowNull: false,
-    unique: true,  // Asumimos que el DNI debe ser único
+    allowNull: true,
+    unique: true, 
   },
   email: {
     type: DataTypes.STRING(255),
     allowNull: false,
-    unique: true,  // Asumimos que el correo debe ser único
+    unique: true,  
   },
   facultad_id: {
     type: DataTypes.INTEGER,
@@ -45,7 +45,7 @@ Docentes.init({
     type: DataTypes.STRING(15),
     allowNull: false,
   },
-  id_usuario: {  // Nuevo campo para almacenar el id_usuario
+  id_usuario: { 
     type: DataTypes.INTEGER,
     allowNull: false,
     references: {
@@ -55,7 +55,7 @@ Docentes.init({
   },
   firma_digital: {
     type: DataTypes.STRING(255),
-    allowNull: true, // opcional, aunque puedes poner false si quieres forzar la subida
+    allowNull: true, 
   }
 }, {
   sequelize,

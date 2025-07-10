@@ -361,10 +361,9 @@ router.post('/registrar-docente-completo', async (req, res) => {
   const { email, dni, whatsapp, facultad_id, programa_academico_id } = req.body;
 
   try {
-    if (!email || !dni || !whatsapp || !facultad_id || !programa_academico_id) {
-      return res.status(400).json({ message: 'Faltan campos requeridos' });
-    }
-
+    if (!email || !whatsapp || !facultad_id || !programa_academico_id) {
+        return res.status(400).json({ message: 'Faltan campos requeridos' });
+      }
     // Verificar si el email ya está registrado
     const existente = await Usuario.findOne({ where: { email } });
     if (existente) {

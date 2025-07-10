@@ -67,23 +67,47 @@ router.put(
   upload.single('firma_digital'),
   async (req, res) => {
     try {
-      const { nombre_docente, celular, id_usuario } = req.body;
+      const {
+        nombre_docente,
+        celular,
+        id_usuario,
+        dni // ✅ Añadido
+      } = req.body;
+
+      // Validación básica
+      if (!dni || !/^\d{8}$/.test(dni)) {
+        return res.status(400).json({ message: 'DNI inválido. Debe tener exactamente 8 dígitos.' });
+      }
 
       const docente = await Docentes.findOne({ where: { id_usuario } });
       if (!docente) {
         return res.status(404).json({ message: 'Docente no encontrado' });
       }
 
-      // Actualizar campos permitidos
+      // Validar si ya existe otro docente con el mismo DNI
+      const otroDocente = await Docentes.findOne({
+        where: {
+          dni,
+          id_docente: { [Op.ne]: docente.id_docente } // distinto del actual
+        }
+      });
+
+      if (otroDocente) {
+        return res.status(409).json({ message: 'Ya existe un docente con este DNI' });
+      }
+
+      // Actualizar campos
       docente.nombre_docente = nombre_docente;
-      docente.celular        = celular;
+      docente.celular = celular;
+      docente.dni = dni; // ✅ Se guarda el DNI actualizado
+
       if (req.file) {
         docente.firma_digital = req.file.filename;
       }
 
       await docente.save();
 
-      // 🔄 Cambiar campo primera_vez a false si es true
+      // Si es la primera vez, marcar como completado
       const usuario = await Usuario.findByPk(id_usuario);
       if (usuario && usuario.primera_vez === true) {
         usuario.primera_vez = false;
