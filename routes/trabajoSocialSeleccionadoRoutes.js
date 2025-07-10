@@ -806,27 +806,34 @@ router.get('/documentos-trabajo/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Busca el trabajo social en la base de datos
-    const trabajo = await TrabajoSocialSeleccionado.findByPk(id);
+    // 👉 Verifica si el id tiene "_", lo que indica que es un miembro del grupo
+    const esMiembro = id.includes('_');
 
-    // Si no se encuentra el trabajo o no tiene PDF asociado
-    if (!trabajo || !trabajo.carta_aceptacion_pdf) {
-      return res.status(404).json({ message: 'Archivo no encontrado para este trabajo social' });
+    let rutaPDF;
+
+    if (esMiembro) {
+      // Ejemplo: id = "143_2019110519"
+      const nombreArchivo = `carta_aceptacion_${id}.pdf`;
+      rutaPDF = path.join(__dirname, '../uploads/cartas_aceptacion', nombreArchivo);
+    } else {
+      // Documento del estudiante principal
+      const trabajo = await TrabajoSocialSeleccionado.findByPk(id);
+      if (!trabajo || !trabajo.carta_aceptacion_pdf) {
+        return res.status(404).json({ message: 'Archivo no encontrado para este trabajo social' });
+      }
+
+      rutaPDF = path.join(__dirname, '../uploads/planes_labor_social', trabajo.carta_aceptacion_pdf);
     }
 
-    // Ruta del archivo PDF en el servidor
-    const rutaPDF = path.join(__dirname, '../uploads/planes_labor_social', trabajo.carta_aceptacion_pdf);
-
-    // Verifica si el archivo existe
     if (!fs.existsSync(rutaPDF)) {
       return res.status(404).json({ message: 'Archivo PDF no existe en el servidor' });
     }
 
-     res.setHeader('Content-Disposition', `inline; filename="carta_aceptacion_${id}.pdf"`);
-     res.sendFile(rutaPDF);
+    res.setHeader('Content-Disposition', `inline; filename="carta_aceptacion.pdf"`);
+    res.sendFile(rutaPDF);
 
   } catch (error) {
-    console.error('Error al servir el PDF:', error);
+    console.error('❌ Error al servir el PDF:', error);
     res.status(500).json({ message: 'Error interno al servir PDF', error });
   }
 });
