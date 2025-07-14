@@ -837,5 +837,38 @@ router.get('/documentos-trabajo/:id', async (req, res) => {
     res.status(500).json({ message: 'Error interno al servir PDF', error });
   }
 });
+// Ruta para servir el PDF de cartas de término
+router.get('/documento-termino/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const esMiembro = id.includes('_');
+    let rutaPDF;
+
+    if (esMiembro) {
+      const nombreArchivo = `carta_Termino_${id}.pdf`;
+      rutaPDF = path.join(__dirname, '../uploads/cartas_termino', nombreArchivo);
+    } else {
+      const trabajo = await TrabajoSocialSeleccionado.findByPk(id);
+      if (!trabajo || !trabajo.carta_termino_pdf) {
+        return res.status(404).json({ message: 'Archivo no encontrado para este trabajo social' });
+      }
+
+      rutaPDF = path.join(__dirname, '../uploads/cartas_termino', trabajo.carta_termino_pdf);
+    }
+
+    if (!fs.existsSync(rutaPDF)) {
+      return res.status(404).json({ message: 'Archivo PDF no existe en el servidor' });
+    }
+
+    res.setHeader('Content-Disposition', `inline; filename="Carta_Termino.pdf"`);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.sendFile(rutaPDF);
+
+  } catch (error) {
+    console.error('❌ Error al servir carta de término:', error);
+    res.status(500).json({ message: 'Error interno al servir PDF de término', error });
+  }
+});
+
 
 module.exports = router;
