@@ -25,7 +25,18 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/png', 'image/jpeg'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Formato no permitido. Solo se permiten archivos PNG, JPG o JPEG.'));
+    }
+  }
+});
+
 router.get('/perfil', authMiddleware, async (req, res) => {
 
   try {
