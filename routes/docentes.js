@@ -323,25 +323,39 @@ router.put('/:id_docente',
 
 
 
-// Eliminar un docente
 router.delete('/:id_docente',
   authMiddleware,
   verificarRol('gestor-udh', 'programa-academico'),
   async (req, res) => {
-  try {
-    const docente = await Docentes.findByPk(req.params.id_docente);
-    if (!docente) {
-      return res.status(404).json({ message: 'Docente no encontrado' });
+    try {
+      const docente = await Docentes.findByPk(req.params.id_docente);
+
+      if (!docente) {
+        return res.status(404).json({ message: 'Docente no encontrado' });
+      }
+
+      const usuarioId = docente.id_usuario;
+
+      // Eliminar primero el docente
+      await docente.destroy();
+
+      // Eliminar el usuario relacionado
+      if (usuarioId) {
+        const usuario = await Usuario.findByPk(usuarioId);
+        if (usuario) {
+          await usuario.destroy();
+        }
+      }
+
+      res.status(200).json({ message: 'Docente y usuario eliminados exitosamente.' });
+
+    } catch (error) {
+      console.error('Error al eliminar docente:', error);
+      res.status(500).json({ message: 'Error al eliminar docente y usuario.', error });
     }
-
-    await docente.destroy();
-
-    res.status(200).json({ message: 'Docente eliminado exitosamente.' });
-  } catch (error) {
-    console.error('Error al eliminar docente:', error);
-    res.status(500).json({ message: 'Error al eliminar docente', error });
   }
-});
+);
+
 
 // Obtener id_docente y firma_digital desde id_usuario
 router.get('/usuario/:usuario_id',

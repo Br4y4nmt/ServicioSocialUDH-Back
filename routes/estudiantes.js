@@ -106,21 +106,32 @@ router.post('/',
 // Obtener todos los estudiantes
 router.get('/',
   authMiddleware,
-  verificarRol('gestor-udh', 'programa-academico', 'docente supervisor', 'alumno'),
+  verificarRol('gestor-udh'),
   async (req, res) => {
-  try {
-    const estudiantes = await Estudiantes.findAll({
-      include: {
-        model: ProgramasAcademicos,
-        attributes: ['nombre_programa'],
-      }
-    });
-    res.status(200).json(estudiantes);
-  } catch (error) {
-    console.error('Error al obtener estudiantes:', error);
-    res.status(500).json({ message: 'Error al obtener estudiantes', error });
-  }
-});
+    try {
+      const estudiantes = await Estudiantes.findAll({
+        include: [
+          {
+            model: ProgramasAcademicos,
+            as: 'programa', // 👈 alias correcto
+            attributes: ['nombre_programa']
+          },
+          {
+            model: Facultades,
+            as: 'facultad', // 👈 alias correcto
+            attributes: ['nombre_facultad']
+          }
+        ]
+      });
+
+      res.status(200).json(estudiantes);
+    } catch (error) {
+      console.error('Error al obtener estudiantes:', error.message);
+      console.error(error);
+      res.status(500).json({ message: 'Error al obtener estudiantes', error });
+    }
+  });
+
 // Obtener estudiante por ID
 router.get('/:id_estudiante',
   authMiddleware,
