@@ -343,6 +343,34 @@ router.put('/actualizar-celular/:usuario_id',
     }
   }
 );
+router.post('/grupo-nombres', async (req, res) => {
+  const { correos } = req.body;
 
+  if (!correos || !Array.isArray(correos)) {
+    return res.status(400).json({ message: 'Se requiere un arreglo de correos.' });
+  }
+
+  try {
+    const resultados = await Promise.all(
+      correos.map(async (correo) => {
+        const codigo = correo.split('@')[0];
+
+        try {
+          const response = await axios.get(`http://www.udh.edu.pe/websauh/secretaria_general/gradosytitulos/datos_estudiante_json.aspx?_c_3456=${codigo}`);
+          const data = response.data?.[0];
+          const nombre = `${data.stu_nombres || ''} ${data.stu_apellido_paterno || ''} ${data.stu_apellido_materno || ''}`.trim();
+          return { correo, nombre };
+        } catch (err) {
+          return { correo, nombre: 'NO ENCONTRADO' };
+        }
+      })
+    );
+
+    res.json(resultados);
+  } catch (error) {
+    console.error('Error al obtener nombres del grupo:', error);
+    res.status(500).json({ message: 'Error al obtener nombres del grupo', error });
+  }
+});
 
 module.exports = router;
