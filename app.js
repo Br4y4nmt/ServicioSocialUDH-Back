@@ -87,7 +87,7 @@ const cartasAceptacionRoutes = require('./routes/cartasAceptacion');
 app.use('/api/cartas-aceptacion', cartasAceptacionRoutes);
 
 
-const cartasTerminoRoutes = require('./routes/cartasTermino'); // ✅ correcto
+const cartasTerminoRoutes = require('./routes/cartasTermino');
 app.use('/api/cartas-termino', cartasTerminoRoutes);
 
 

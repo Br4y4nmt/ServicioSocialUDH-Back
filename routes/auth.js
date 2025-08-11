@@ -33,7 +33,10 @@ router.post('/register', async (req, res) => {
     if (!data) {
       return res.status(400).json({ message: 'Código inválido o no encontrado' });
     }
-
+    
+    if (dni !== data.stu_dni) {
+    return res.status(400).json({ message: 'El DNI ingresado no coincide con el DNI del estudiante' });
+  }
     // 2. Verificar si el estudiante está en el ciclo 7 o superior
     if (data.stu_ciclo < 7) {
       return res.status(400).json({ message: 'Solo pueden registrarse estudiantes del ciclo 7 o superior' });
@@ -268,7 +271,7 @@ router.post('/google', async (req, res) => {
     let programa_academico_id = null;
     let facultad_id = null;
 
-    if (usuario.rol_id === 4) { // Si es responsable académico
+    if (usuario.rol_id === 4) { 
       const { ProgramasAcademicos } = require('../models');
       const programa = await ProgramasAcademicos.findOne({
         where: { usuario_id: usuario.id_usuario },

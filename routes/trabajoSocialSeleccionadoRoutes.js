@@ -12,6 +12,7 @@ const LaboresSociales = require('../models/LaboresSociales');
 const Estudiantes = require('../models/Estudiantes');
 const Facultades = require('../models/Facultades'); 
 const LineaDeAccion = require('../models/LineaDeAccion'); 
+const Docentes = require('../models/Docentes');
 
 
 const storageCertificadoFinal = multer.diskStorage({
@@ -123,6 +124,48 @@ const uploadCartaTermino = multer({
     cb(null, true);
   }
 });
+
+router.get('/supervisores',
+  authMiddleware,
+  verificarRol('gestor-udh', 'docente supervisor', 'programa-academico'),
+  async (req, res) => {
+    try {
+      const rows = await TrabajoSocialSeleccionado.findAll({
+        include: [
+          { model: Estudiantes, attributes: ['nombre_estudiante'] },
+          { model: ProgramasAcademicos, attributes: ['nombre_programa'] },
+          { model: Docentes, attributes: ['nombre_docente'], as: 'Docente' }, // usa el alias de arriba
+        ],
+        attributes: [
+          'id',
+          'estado_plan_labor_social',
+          'carta_aceptacion_pdf',
+          'usuario_id',
+          'programa_academico_id',
+          'docente_id'
+        ],
+        order: [['createdAt', 'DESC']]
+      });
+
+      const data = rows.map(r => {
+        const p = r.get({ plain: true });
+        return {
+          id: p.id,
+          estudiante: { nombre_estudiante: p.Estudiante?.nombre_estudiante || null },
+          programa:   { nombre_programa:   p.ProgramasAcademico?.nombre_programa || null },
+          estado: p.estado_plan_labor_social || 'pendiente',
+          carta_aceptacion_pdf: p.carta_aceptacion_pdf || null,
+          supervisor: { nombre_supervisor: p.Docente?.nombre_docente || null }
+        };
+      });
+
+      res.status(200).json(data);
+    } catch (error) {
+      console.error('Error al obtener supervisores:', error);
+      res.status(500).json({ message: 'Error al obtener supervisores', error });
+    }
+  }
+);
 router.get('/informes-finales',
   authMiddleware,
   verificarRol('docente supervisor', 'gestor-udh', 'programa-academico'),
