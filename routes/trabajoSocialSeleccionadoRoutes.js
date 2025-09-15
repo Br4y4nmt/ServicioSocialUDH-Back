@@ -913,5 +913,71 @@ router.get('/documento-termino/:id', async (req, res) => {
   }
 });
 
+router.get('/seguimiento/:id_estudiante',
+  authMiddleware,
+  verificarRol('gestor-udh', 'docente supervisor', 'programa-academico'),
+  async (req, res) => {
+  try {
+    const { id_estudiante } = req.params;
+
+    // 1️⃣ Buscar primero al estudiante y su id_usuario
+    const estudiante = await Estudiantes.findByPk(id_estudiante, {
+      attributes: ['id_estudiante', 'id_usuario', 'nombre_estudiante', 'email'],
+      include: [
+        { model: ProgramasAcademicos, as: 'programa', attributes: ['nombre_programa'] }
+      ]
+    });
+
+    if (!estudiante) {
+      return res.status(404).json({ message: 'Estudiante no encontrado' });
+    }
+
+    // 2️⃣ Buscar el trámite por id_usuario (que está en trabajo_social_seleccionado)
+    const tramite = await TrabajoSocialSeleccionado.findOne({
+      where: { usuario_id: estudiante.id_usuario },
+      attributes: [
+        'estado_plan_labor_social',
+        'conformidad_plan_social',
+        'solicitud_termino',
+        'estado_informe_final'
+      ]
+    });
+
+    // 3️⃣ Armar la respuesta final con tooltips incluidos
+    const data = {
+      estudiante: estudiante.nombre_estudiante,
+      email: estudiante.email,
+      programa: estudiante.programa?.nombre_programa || "SIN PROGRAMA",
+      pasos: [
+        { 
+          paso: "Plan de Labor Social", 
+          estado: tramite?.estado_plan_labor_social || "pendiente",
+          tooltip: "El estudiante registró su plan de labor social para revisión."
+        },
+        { 
+          paso: "Conformidad del Plan", 
+          estado: tramite?.conformidad_plan_social || "pendiente",
+          tooltip: "El docente supervisor debe aprobar o rechazar el plan presentado (documento pdf creado mediante el sistema)."
+        },
+        { 
+          paso: "Solicitud de Carta de Término", 
+          estado: tramite?.solicitud_termino || "no_solicitada",
+          tooltip: "El estudiante aun no solicita la carta de término al docente superisor o el docente aun no le aprobo su solicitud."
+        },
+        { 
+          paso: "Informe Final", 
+          estado: tramite?.estado_informe_final || "pendiente",
+          tooltip: "El informe final debe ser enviado y aprobado por el docente para finalizar el trámite y brindarle su certificado."
+        }
+      ]
+    };
+
+    res.status(200).json(data);
+
+  } catch (error) {
+    console.error("❌ Error en seguimiento:", error);
+    res.status(500).json({ message: "Error al obtener seguimiento del trámite", error });
+  }
+});
 
 module.exports = router;
