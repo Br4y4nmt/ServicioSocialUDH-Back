@@ -13,7 +13,7 @@ const Estudiantes = require('../models/Estudiantes');
 const Facultades = require('../models/Facultades'); 
 const LineaDeAccion = require('../models/LineaDeAccion'); 
 const Docentes = require('../models/Docentes');
-
+const { Op } = require('sequelize');
 
 const storageCertificadoFinal = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -393,6 +393,52 @@ router.get('/docente/:docente_id',
 });
 
   
+
+router.get('/docente/:docente_id/nuevo',
+  authMiddleware,
+  verificarRol('docente supervisor', 'gestor-udh'),
+  async (req, res) => {
+    try {
+      const docente_id = req.params.docente_id;
+
+      const trabajosSociales = await TrabajoSocialSeleccionado.findAll({
+        where: {
+          docente_id,
+          // Solo registros con conformidad en 'pendiente'
+          conformidad_plan_social: 'pendiente',               // <- filtro clave
+          // Si tienes valores con mayúsculas/mixtos, usa una de estas dos opciones:
+          // [Op.and]: [sequelize.where(sequelize.fn('LOWER', sequelize.col('conformidad_plan_social')), 'pendiente')],
+        },
+        include: [
+          { model: ProgramasAcademicos, attributes: ['nombre_programa'] },
+          { model: LaboresSociales, attributes: ['id_labores', 'nombre_labores'] },
+          { model: Estudiantes, attributes: ['nombre_estudiante'] },
+          { model: Facultades, as: 'Facultad', attributes: ['nombre_facultad'] },
+        ],
+        attributes: [
+          'id',
+          'usuario_id',
+          'programa_academico_id',
+          'estado_plan_labor_social',
+          'labor_social_id',
+          'archivo_plan_social',
+          'conformidad_plan_social',
+          'tipo_servicio_social',
+          'solicitud_termino',
+          'estado_informe_final'
+        ]
+      });
+
+      res.status(200).json(trabajosSociales);
+    } catch (error) {
+      console.error('Error al obtener trabajos sociales de docente:', error);
+      res.status(500).json({ message: 'Error al obtener trabajos sociales de docente', error });
+    }
+});
+
+
+
+
   // Ruta PUT para actualizar el estado del trabajo social
   router.put('/:id',
   authMiddleware,
