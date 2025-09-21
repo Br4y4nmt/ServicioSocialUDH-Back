@@ -95,6 +95,100 @@ router.post('/register', async (req, res) => {
   }
 });
 
+
+
+router.post('/register-codigo', authMiddleware, async (req, res) => {
+  const { codigo, whatsapp } = req.body;
+
+  try {
+    // 1. Validar entrada
+    if (!codigo || !whatsapp) {
+      return res.status(400).json({ message: 'Faltan datos requeridos' });
+    }
+
+    if (codigo.length !== 10) {
+      return res.status(400).json({ message: 'El código debe tener exactamente 10 dígitos' });
+    }
+
+    // 2. Consultar API externa UDH
+    let data;
+    try {
+      const resUDH = await axios.get(
+        `http://www.udh.edu.pe/websauh/secretaria_general/gradosytitulos/datos_estudiante_json.aspx?_c_3456=${codigo}`,
+        { timeout: 7000 }
+      );
+      data = resUDH.data[0];
+    } catch (error) {
+      console.error('❌ Error conectando con API UDH:', error.message);
+      return res.status(503).json({ message: 'Servidor UDH no disponible. Intenta más tarde.' });
+    }
+
+    if (!data) {
+      return res.status(400).json({ message: 'Código inválido o no encontrado en UDH' });
+    }
+
+    // 🔴 Antes estaba aquí la validación del ciclo, ya no se usa
+    // if (data.stu_ciclo < 7) { ... }
+
+    // 3. Validar que el correo no exista
+    const email = `${codigo}@udh.edu.pe`;
+    const existingUser = await Usuario.findOne({ where: { email } });
+    if (existingUser) {
+      return res.status(409).json({ message: 'El correo ya está registrado' });
+    }
+
+    // 4. Buscar facultad
+    const facultad = await Facultades.findOne({
+      where: { nombre_facultad: data.stu_facultad.trim() }
+    });
+    if (!facultad) {
+      return res.status(400).json({ message: 'Facultad no encontrada' });
+    }
+
+    // 5. Buscar programa
+    const programa = await ProgramasAcademicos.findOne({
+      where: {
+        nombre_programa: data.stu_programa.trim(),
+        id_facultad: facultad.id_facultad
+      }
+    });
+    if (!programa) {
+      return res.status(400).json({ message: 'Programa académico no encontrado' });
+    }
+
+    // 6. Crear usuario
+    const nuevoUsuario = await Usuario.create({
+      email,
+      dni: data.stu_dni,
+      whatsapp,
+      password: '', // Opcional
+      rol_id: 3
+    });
+
+    // 7. Crear estudiante
+    await Estudiantes.create({
+      nombre_estudiante: `${data.stu_nombres} ${data.stu_apellido_paterno} ${data.stu_apellido_materno}`,
+      dni: data.stu_dni,
+      email,
+      celular: whatsapp,
+      facultad_id: facultad.id_facultad,
+      programa_academico_id: programa.id_programa,
+      id_usuario: nuevoUsuario.id_usuario,
+      codigo: data.stu_codigo
+    });
+
+    res.status(201).json({ message: 'Estudiante registrado correctamente' });
+
+  } catch (error) {
+    console.error('❌ Error registrando estudiante:', error);
+    res.status(500).json({ message: 'Error registrando estudiante', error: error.message });
+  }
+});
+
+
+
+
+
 router.post('/register-docente-nuevo', authMiddleware, async (req, res) => {
   const { email, dni, whatsapp } = req.body;
 

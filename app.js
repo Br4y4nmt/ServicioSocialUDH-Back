@@ -42,7 +42,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-        'frame-ancestors': ["'self'", 'https://servicio-social.sistemasudh.com'],
+        'frame-ancestors': ["'self'", 'https://servicio-social.sistemasudh.com'], 
       },
     },
   })
