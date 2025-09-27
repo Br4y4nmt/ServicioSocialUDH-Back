@@ -63,6 +63,9 @@ const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
 
 
+const systemConfigRoutes  = require('./routes/systemConfig');
+app.use('/api/system-config', systemConfigRoutes);
+
 const facultadesRoutes = require('./routes/facultades');  
 app.use('/api/facultades', facultadesRoutes);
 
@@ -82,6 +85,9 @@ app.use('/api/usuarios', usuariosRoutes);
 const certificadosFinalMiembrosRoutes = require('./routes/certificadosFinalMiembros');
 app.use('/api/certificados-final', certificadosFinalMiembrosRoutes);
 
+
+const impersonateRoutes = require('./routes/impersonate');
+app.use('/api/admin', impersonateRoutes);
 
 const cartasAceptacionRoutes = require('./routes/cartasAceptacion');
 app.use('/api/cartas-aceptacion', cartasAceptacionRoutes);
@@ -107,6 +113,7 @@ app.use('/api/estudiantes', estudiantesRoutes);
 
 
 const trabajoSocialSeleccionadoRoutes = require('./routes/trabajoSocialSeleccionadoRoutes');
+const SystemConfig = require('./models/SystemConfig');
 app.use('/api/trabajo-social', trabajoSocialSeleccionadoRoutes);
 
 
@@ -115,6 +122,7 @@ const syncDatabase = async () => {
     
     await Roles.sync();
     await Usuario.sync();
+    await SystemConfig.sync();
     await Notificacion.sync();
     await ProgramasAcademicos.sync();
     await Docentes.sync();
