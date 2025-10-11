@@ -447,42 +447,65 @@ router.get('/docente/:docente_id/nuevo',
     try {
       const { id } = req.params;
       const { estado_plan_labor_social, conformidad_plan_social } = req.body;
-  
+
       const estadosValidos = ['pendiente', 'aceptado', 'rechazado'];
-  
-      // Verifica si se envió al menos un campo válido
+
+      // Validación de campos requeridos
       if (!estado_plan_labor_social && !conformidad_plan_social) {
         return res.status(400).json({ message: 'Debe proporcionar al menos un campo para actualizar.' });
       }
-  
-      // Validaciones individuales si se proporciona el campo
+
+      // Validaciones de valores permitidos
       if (estado_plan_labor_social && !estadosValidos.includes(estado_plan_labor_social)) {
-        return res.status(400).json({ message: 'Estado de plan inválido' });
+        return res.status(400).json({ message: 'Estado de plan inválido.' });
       }
-  
+
       if (conformidad_plan_social && !estadosValidos.includes(conformidad_plan_social)) {
-        return res.status(400).json({ message: 'Estado de conformidad inválido' });
+        return res.status(400).json({ message: 'Estado de conformidad inválido.' });
       }
-  
+
+      // Buscar el trabajo social
       const trabajoSocial = await TrabajoSocialSeleccionado.findOne({ where: { id } });
-  
+
       if (!trabajoSocial) {
-        return res.status(404).json({ message: 'Trabajo social no encontrado' });
+        return res.status(404).json({ message: 'Trabajo social no encontrado.' });
       }
-  
-      // Prepara los campos a actualizar
+
+      // Preparar los campos a actualizar
       const camposActualizar = {};
       if (estado_plan_labor_social) camposActualizar.estado_plan_labor_social = estado_plan_labor_social;
       if (conformidad_plan_social) camposActualizar.conformidad_plan_social = conformidad_plan_social;
-  
+
+      // 🔥 Si el docente rechaza, eliminar el archivo del plan social
+      if (conformidad_plan_social === 'rechazado' && trabajoSocial.archivo_plan_social) {
+        const rutaArchivo = path.join(__dirname, '..', 'uploads', 'planes_labor_social', trabajoSocial.archivo_plan_social);
+
+        try {
+          if (fs.existsSync(rutaArchivo)) {
+            await fs.promises.unlink(rutaArchivo); // elimina físicamente el archivo
+            console.log(`Archivo eliminado: ${rutaArchivo}`);
+          }
+          camposActualizar.archivo_plan_social = null; // limpiar referencia en BD
+        } catch (error) {
+          console.error('⚠️ Error al eliminar archivo del plan social:', error);
+          // No detenemos la ejecución, solo notificamos
+        }
+      }
+
+      // Actualizar los campos en BD
       await trabajoSocial.update(camposActualizar);
-  
-      res.status(200).json(trabajoSocial);
+
+      res.status(200).json({
+        message: 'Trabajo social actualizado correctamente.',
+        data: trabajoSocial
+      });
+
     } catch (error) {
-      console.error('Error al actualizar el trabajo social:', error);
-      res.status(500).json({ message: 'Error interno al actualizar', error });
+      console.error('❌ Error al actualizar el trabajo social:', error);
+      res.status(500).json({ message: 'Error interno al actualizar el trabajo social.', error });
     }
   });
+
   
 // Ruta para generar y guardar automáticamente un PDF cuando el docente acepta el plan
 router.post('/generar-pdf/:id',
