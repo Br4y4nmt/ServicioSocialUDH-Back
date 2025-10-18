@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const TrabajoSocialSeleccionado = require('../models/TrabajoSocialSeleccionado');
 const ProgramasAcademicos = require('../models/ProgramasAcademicos');
+const CronogramaActividades = require('../models/CronogramaActividad');
 const LaboresSociales = require('../models/LaboresSociales');
 const Estudiantes = require('../models/Estudiantes');
 const Facultades = require('../models/Facultades'); 
@@ -134,7 +135,7 @@ router.get('/supervisores',
         include: [
           { model: Estudiantes, attributes: ['nombre_estudiante'] },
           { model: ProgramasAcademicos, attributes: ['nombre_programa'] },
-          { model: Docentes, attributes: ['nombre_docente'], as: 'Docente' }, // usa el alias de arriba
+          { model: Docentes, attributes: ['nombre_docente'], as: 'Docente' }, 
         ],
         attributes: [
           'id',
@@ -1048,5 +1049,220 @@ router.get('/seguimiento/:id_estudiante',
     res.status(500).json({ message: "Error al obtener seguimiento del trámite", error });
   }
 });
+
+
+
+router.get('/fecha-fin-primero/:usuario_id',
+  authMiddleware,
+  verificarRol('gestor-udh', 'docente supervisor'),
+  async (req, res) => {
+    try {
+      const { usuario_id } = req.params;
+
+      // Buscar el trabajo social correspondiente al usuario
+      const trabajo = await TrabajoSocialSeleccionado.findOne({
+        where: { usuario_id },
+        attributes: ['id']
+      });
+
+      if (!trabajo) {
+        return res.status(404).json({
+          message: 'No se encontró un trabajo social para este estudiante.'
+        });
+      }
+
+      // Buscar todos los cronogramas vinculados al trabajo social
+      const cronogramas = await CronogramaActividades.findAll({
+        where: { trabajo_social_id: trabajo.id },
+        attributes: ['id', 'resultados', 'fecha_fin_primero'], // 👈 eliminamos el campo 'fecha'
+        order: [['fecha_fin_primero', 'ASC']]
+      });
+
+      if (!cronogramas || cronogramas.length === 0) {
+        return res.status(404).json({
+          message: 'No se encontraron cronogramas para este trabajo social.'
+        });
+      }
+
+      // Respuesta limpia
+      res.status(200).json({
+        message: 'Fechas obtenidas correctamente',
+        total: cronogramas.length,
+        cronogramas
+      });
+
+    } catch (error) {
+      console.error('❌ Error al obtener fechas_fin_primero:', error);
+      res.status(500).json({
+        message: 'Error interno al obtener fechas_fin_primero',
+        error
+      });
+    }
+  }
+);
+
+
+
+
+router.put(
+  '/actualizar-fecha/:id',
+  authMiddleware,
+  verificarRol('gestor-udh', 'docente supervisor'),
+  async (req, res) => {
+    try {
+      const { id } = req.params; // ID del registro del cronograma
+      const { fecha_fin_primero, resultados } = req.body;
+
+      // Validación básica
+      if (!fecha_fin_primero) {
+        return res.status(400).json({ message: 'La fecha_fin_primero es obligatoria.' });
+      }
+
+      // Buscar el registro correspondiente
+      const cronograma = await CronogramaActividades.findByPk(id);
+
+      if (!cronograma) {
+        return res.status(404).json({ message: 'No se encontró el cronograma con el ID especificado.' });
+      }
+
+      // Actualizar campos
+      cronograma.fecha_fin_primero = fecha_fin_primero;
+      if (resultados) cronograma.resultados = resultados;
+
+      await cronograma.save();
+
+      res.status(200).json({
+        message: 'Fecha actualizada correctamente',
+        cronograma,
+      });
+    } catch (error) {
+      console.error('❌ Error al actualizar la fecha:', error);
+      res.status(500).json({ message: 'Error interno al actualizar la fecha', error });
+    }
+  }
+);
+
+
+
+
+router.get(
+  '/cambio-asesor/detalle',
+  authMiddleware,
+  verificarRol('gestor-udh'),
+  async (req, res) => {
+    try {
+      const trabajos = await TrabajoSocialSeleccionado.findAll({
+        where: { estado_plan_labor_social: 'aceptado' },
+        include: [
+          {
+            model: Estudiantes,
+            attributes: ['nombre_estudiante', 'programa_academico_id'],
+            include: [
+              {
+                model: ProgramasAcademicos,
+                as: 'programa', // 👈 usa el alias correcto definido en tu modelo Estudiantes
+                attributes: ['id_programa', 'nombre_programa'],
+              },
+            ],
+          },
+          {
+            model: Docentes,
+            attributes: ['nombre_docente'],
+          },
+        ],
+        attributes: [
+          'id',
+          'programa_academico_id', // 👈 lo incluimos también por si se usa en frontend
+          'docente_id',
+          'usuario_id',
+        ],
+        order: [['id', 'ASC']],
+      });
+
+      const data = trabajos.map((t) => {
+        const plain = t.get({ plain: true });
+        return {
+          id: plain.id,
+          programa_academico_id: plain.programa_academico_id,
+          nombre_estudiante: plain.Estudiante?.nombre_estudiante || '—',
+          asesor: plain.Docente?.nombre_docente || 'Sin asignar',
+          programa_academico:
+            plain.Estudiante?.programa?.nombre_programa || '—', // ✅ nombre del programa del estudiante
+        };
+      });
+
+      res.status(200).json({
+        message:
+          data.length > 0
+            ? 'Listado de trabajos sociales aceptados obtenido correctamente'
+            : 'No se encontraron trabajos sociales aceptados.',
+        total: data.length,
+        data,
+      });
+    } catch (error) {
+      console.error('❌ Error al obtener trabajos sociales con detalle:', error);
+      res.status(500).json({
+        message: 'Error interno al obtener trabajos sociales con detalle',
+        error: error.message,
+      });
+    }
+  }
+);
+
+
+
+
+router.put(
+  '/cambio-asesor/:id',
+  authMiddleware,
+  verificarRol('gestor-udh'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { nuevo_docente_id } = req.body;
+
+      if (!nuevo_docente_id) {
+        return res.status(400).json({
+          message: 'Debe proporcionar el ID del nuevo asesor (nuevo_docente_id).',
+        });
+      }
+
+      // 🔍 Buscar el registro del trabajo social seleccionado
+      const trabajo = await TrabajoSocialSeleccionado.findByPk(id);
+      if (!trabajo) {
+        return res.status(404).json({
+          message: 'No se encontró el trabajo social especificado.',
+        });
+      }
+
+      // 🔍 Verificar que el nuevo docente exista
+      const docenteExiste = await Docentes.findByPk(nuevo_docente_id);
+      if (!docenteExiste) {
+        return res.status(404).json({
+          message: 'El docente seleccionado no existe.',
+        });
+      }
+
+      // ✏️ Actualizar el campo docente_id
+      trabajo.docente_id = nuevo_docente_id;
+      await trabajo.save();
+
+      res.status(200).json({
+        message: 'Asesor actualizado correctamente.',
+        data: {
+          id_trabajo: trabajo.id,
+          nuevo_docente_id,
+          nombre_docente: docenteExiste.nombre_docente,
+        },
+      });
+    } catch (error) {
+      console.error('❌ Error al actualizar el asesor:', error);
+      res.status(500).json({
+        message: 'Error interno al actualizar el asesor.',
+        error: error.message,
+      });
+    }
+  }
+);
 
 module.exports = router;

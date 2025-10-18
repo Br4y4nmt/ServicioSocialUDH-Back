@@ -535,5 +535,50 @@ router.get('/verificar-docente/:id_docente', async (req, res) => {
 
 
 
+router.get(
+  '/programa/:id_programa',
+  authMiddleware,
+  verificarRol('gestor-udh', 'programa-academico', 'docente supervisor'),
+  async (req, res) => {
+    try {
+      const { id_programa } = req.params;
 
+      // Buscar docentes que pertenecen a ese programa
+      const docentes = await Docentes.findAll({
+        where: { programa_academico_id: id_programa },
+        include: [
+          {
+            model: ProgramasAcademicos,
+            as: 'ProgramaDelDocente',
+            attributes: ['nombre_programa']
+          },
+          {
+            model: Facultades,
+            as: 'Facultade',
+            attributes: ['nombre_facultad']
+          }
+        ],
+        order: [['nombre_docente', 'ASC']]
+      });
+
+      if (!docentes || docentes.length === 0) {
+        return res.status(404).json({
+          message: 'No se encontraron docentes para este programa académico.'
+        });
+      }
+
+      res.status(200).json({
+        message: 'Docentes obtenidos correctamente',
+        total: docentes.length,
+        data: docentes
+      });
+    } catch (error) {
+      console.error('❌ Error al obtener docentes por programa:', error);
+      res.status(500).json({
+        message: 'Error interno al obtener docentes por programa',
+        error: error.message
+      });
+    }
+  }
+);
 module.exports = router;
