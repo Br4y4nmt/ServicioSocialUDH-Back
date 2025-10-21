@@ -1052,7 +1052,8 @@ router.get('/seguimiento/:id_estudiante',
 
 
 
-router.get('/fecha-fin-primero/:usuario_id',
+router.get(
+  '/fecha-fin-primero/:usuario_id',
   authMiddleware,
   verificarRol('gestor-udh', 'docente supervisor'),
   async (req, res) => {
@@ -1074,7 +1075,7 @@ router.get('/fecha-fin-primero/:usuario_id',
       // Buscar todos los cronogramas vinculados al trabajo social
       const cronogramas = await CronogramaActividades.findAll({
         where: { trabajo_social_id: trabajo.id },
-        attributes: ['id', 'resultados', 'fecha_fin_primero'], // 👈 eliminamos el campo 'fecha'
+        attributes: ['id', 'actividad', 'fecha_fin_primero'], // ✅ Cambiado 'resultados' por 'actividad'
         order: [['fecha_fin_primero', 'ASC']]
       });
 
