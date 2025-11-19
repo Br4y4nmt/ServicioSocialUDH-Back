@@ -161,6 +161,9 @@ router.post('/:usuario_id',
     res.status(500).json({ message: 'Error al guardar cronograma', error });
   }
 });
+
+
+
 router.patch('/:id/estado',
   authMiddleware,
   verificarRol('docente supervisor', 'gestor-udh', 'programa-academico'),

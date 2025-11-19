@@ -6,7 +6,6 @@ const fs = require('fs');
 const { CartaTermino } = require('../models');
 const authMiddleware = require('../middlewares/authMiddleware');
 const verificarRol = require('../middlewares/verificarRol');
-// 📁 Configuración del almacenamiento
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const dir = path.join(__dirname, '../uploads/cartas_termino_integrantes');
@@ -16,7 +15,7 @@ const storage = multer.diskStorage({
     cb(null, dir);
   },
   filename: function (req, file, cb) {
-  const ext = path.extname(file.originalname); // '.pdf'
+  const ext = path.extname(file.originalname); 
   const timestamp = Date.now();
   cb(null, `carta_termino_${timestamp}${ext}`);
 }
@@ -24,7 +23,6 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// 📤 Ruta para subir y registrar carta de término
 router.post('/',
   authMiddleware,
   verificarRol('docente supervisor', 'gestor-udh'),
@@ -51,7 +49,6 @@ router.post('/',
   }
 });
 
-// 📥 Obtener cartas de término del grupo por trabajo_id
 router.get('/grupo/:trabajo_id',
   authMiddleware,
   verificarRol('alumno', 'docente supervisor', 'gestor-udh', 'programa-academico'),

@@ -1,4 +1,3 @@
-// models/TrabajoSocialSeleccionado.js
 
 const { Model, DataTypes } = require('sequelize');
 
@@ -37,7 +36,7 @@ TrabajoSocialSeleccionado.init({
     type: DataTypes.ENUM('pendiente', 'aceptado', 'rechazado'),
     defaultValue: 'pendiente'
   },
-  facultad_id: { // Nuevo campo
+  facultad_id: { 
     type: DataTypes.INTEGER,
     allowNull: false
   },
@@ -45,7 +44,7 @@ TrabajoSocialSeleccionado.init({
     type: DataTypes.ENUM('pendiente', 'aceptado', 'rechazado'),
     allowNull: true 
   },
-  archivo_plan_social: { // NUEVO CAMPO
+  archivo_plan_social: { 
     type: DataTypes.STRING,
     allowNull: true
   },
@@ -59,7 +58,7 @@ TrabajoSocialSeleccionado.init({
   allowNull: false,
   defaultValue: 'no_solicitada'
 },
-carta_aceptacion_pdf: { // Nuevo campo para almacenar PDF generado
+carta_aceptacion_pdf: { 
     type: DataTypes.STRING,
     allowNull: true
   },
@@ -76,7 +75,7 @@ certificado_final: {
   type: DataTypes.STRING,
   allowNull: true,
 },
-carta_termino_pdf: { // ✅ PDF generado de la carta de término
+carta_termino_pdf: { 
     type: DataTypes.STRING,
     allowNull: true
   }

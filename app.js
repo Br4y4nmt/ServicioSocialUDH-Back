@@ -1,12 +1,10 @@
-require('dotenv').config(); // Cargar variables de entorno desde el archivo .env
+require('dotenv').config(); 
 
 const express = require('express');
 const helmet = require('helmet');
-const cors = require('cors');  // Importa cors
+const cors = require('cors');  
 const path = require('path');
 const sequelize = require('./config/database');
-
-// Modelos
 const Roles = require('./models/Roles');
 const Usuario = require('./models/Usuario');
 const Notificacion = require('./models/Notificacion');
@@ -18,21 +16,21 @@ const ProgramasAcademicos = require('./models/ProgramasAcademicos');
 const Estudiantes = require('./models/Estudiantes');
 const CronogramaActividad = require('./models/CronogramaActividad');
 const Docentes = require('./models/Docentes');
+const ObservacionTrabajoSocial = require('./models/ObservacionTrabajoSocial');
 const LaboresSociales = require('./models/LaboresSociales');
 const TrabajoSocialSeleccionado = require('./models/TrabajoSocialSeleccionado');
 const IntegranteGrupo = require('./models/IntegranteGrupo');
 const Facultades = require('./models/Facultades');
 const app = express();
 
-// Configuración de CORS
 const corsOptions = {
   origin: 'https://servicio-social.sistemasudh.com', 
-  //origin: 'http://localhost:3000', // O la URL de tu frontend
-  methods: ['GET', 'POST', 'PUT', 'DELETE','PATCH'],  // Métodos permitidos
-  allowedHeaders: ['Content-Type', 'Authorization'],  // Encabezados permitidos
-  credentials: true,  // Permite el envío de cookies y autenticación
+  //origin: 'http://localhost:3000', 
+  methods: ['GET', 'POST', 'PUT', 'DELETE','PATCH'],  
+  allowedHeaders: ['Content-Type', 'Authorization'],  
+  credentials: true,  
 };
-app.use(cors(corsOptions));  // Usa esta configuración de CORS
+app.use(cors(corsOptions));  
 
 
 app.use(
@@ -47,10 +45,7 @@ app.use(
     },
   })
 );
-// Middleware para parsear JSON en las solicitudes
 app.use(express.json());
-
-// Servir la carpeta de archivos subidos
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
   setHeaders: (res) => {
     res.set('Access-Control-Allow-Origin', '*'); 
@@ -126,6 +121,7 @@ const syncDatabase = async () => {
     await Notificacion.sync();
     await ProgramasAcademicos.sync();
     await Docentes.sync();
+    await ObservacionTrabajoSocial.sync();
     await LaboresSociales.sync();
     await TrabajoSocialSeleccionado.sync();
     await Facultades.sync();

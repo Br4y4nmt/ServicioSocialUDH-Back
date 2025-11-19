@@ -12,6 +12,7 @@ const CronogramaActividades = require('../models/CronogramaActividad');
 const LaboresSociales = require('../models/LaboresSociales');
 const Estudiantes = require('../models/Estudiantes');
 const Facultades = require('../models/Facultades'); 
+const ObservacionTrabajoSocial = require('../models/ObservacionTrabajoSocial');
 const LineaDeAccion = require('../models/LineaDeAccion'); 
 const Docentes = require('../models/Docentes');
 const { Op } = require('sequelize');
@@ -37,11 +38,9 @@ const uploadCertificadoFinal = multer({
   }
 });
 
-
-// Configuración de Multer para guardar PDFs
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/planes_labor_social'); // asegúrate de crear esta carpeta
+    cb(null, 'uploads/planes_labor_social'); 
   },
   filename: function (req, file, cb) {
     const uniqueName = Date.now() + '-' + file.originalname;
@@ -59,7 +58,6 @@ const upload = multer({
     cb(null, true);
   }
 });
-// ✅ CONFIGURACIÓN 2 - Para archivo_plan_social (NUEVA CONFIGURACIÓN QUE DEBES AGREGAR AQUÍ 👇)
 const storageArchivoPlan = multer.diskStorage({
     destination: function (req, file, cb) {
       cb(null, 'uploads/planes_labor_social');
@@ -79,14 +77,13 @@ const storageArchivoPlan = multer.diskStorage({
       cb(null, true);
     }
   });
-  // 📂 Nueva configuración para guardar carta de término
 const storageCartaTermino = multer.diskStorage({
   destination: function (req, file, cb) {
     const dir = path.join(__dirname, '../uploads/cartas_termino');
     if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true }); // ✅ CREA la carpeta si no existe
+      fs.mkdirSync(dir, { recursive: true }); 
     }
-    cb(null, dir); // ✅ Ruta absoluta
+    cb(null, dir); 
   },
   filename: function (req, file, cb) {
     const uniqueName = `carta_termino_${Date.now()}${path.extname(file.originalname)}`;
@@ -98,7 +95,7 @@ const storageCartaTermino = multer.diskStorage({
 // 📄 Configuración para guardar el informe final
 const storageInformeFinal = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/informes_finales'); // 📁 asegúrate de crear esta carpeta
+    cb(null, 'uploads/informes_finales'); 
   },
   filename: function (req, file, cb) {
     const uniqueName = `informe_final_${Date.now()}${path.extname(file.originalname)}`;
@@ -197,8 +194,8 @@ router.get('/informes-finales',
           'estado_informe_final',
           'createdAt',
           'certificado_final',
-          'tipo_servicio_social', // 👈 NECESARIO
-          'usuario_id'             // 👈 para distinguir estudiante principal
+          'tipo_servicio_social',
+          'usuario_id'            
         ]
       });
 
@@ -246,10 +243,9 @@ router.post('/guardar-informe-final',
       return res.status(404).json({ message: 'Trabajo social no encontrado' });
     }
 
-    // 👉 Aquí puedes agregar una columna como `informe_final_pdf` si no existe aún en tu modelo
     await trabajo.update({ 
     informe_final_pdf: req.file.filename,
-    estado_informe_final: 'pendiente' // 👈 agregar esta línea
+    estado_informe_final: 'pendiente' 
   });
 
     res.status(200).json({ message: 'Informe final guardado correctamente', archivo: req.file.filename });
@@ -259,7 +255,6 @@ router.post('/guardar-informe-final',
   }
 });
 
-// Ruta POST para guardar selección
 router.post('/',
   authMiddleware,
   verificarRol('alumno'),
@@ -272,21 +267,18 @@ router.post('/',
             labor_social_id,
             facultad_id,
             tipo_servicio_social,
-            linea_accion_id // Agregar facultad_id
+            linea_accion_id 
         } = req.body;
 
-        // Validaciones mínimas
         if (!usuario_id || isNaN(usuario_id)) {
             return res.status(400).json({ message: 'usuario_id inválido' });
         }
-        if (!facultad_id || isNaN(facultad_id)) {  // Validar facultad_id
+        if (!facultad_id || isNaN(facultad_id)) { 
             return res.status(400).json({ message: 'facultad_id inválido' });
         }   
         if (!['individual', 'grupal'].includes(tipo_servicio_social)) {
           return res.status(400).json({ message: 'tipo_servicio_social inválido' });
         }
-        // Ruta completa del archivo
-
        const nuevoRegistro = await TrabajoSocialSeleccionado.create({
         usuario_id: parseInt(usuario_id),
         programa_academico_id: parseInt(programa_academico_id),
@@ -294,7 +286,7 @@ router.post('/',
         labor_social_id: parseInt(labor_social_id),
         facultad_id: parseInt(facultad_id),
         tipo_servicio_social,
-        linea_accion_id: parseInt(linea_accion_id) // ✅ NUEVO CAMPO
+        linea_accion_id: parseInt(linea_accion_id)
       });
 
         res.status(201).json(nuevoRegistro);
@@ -313,7 +305,6 @@ router.get('/usuario/:usuario_id',
 
     const trabajoSocial = await TrabajoSocialSeleccionado.findOne({
       where: { usuario_id },
-      // ✅ puedes especificar los atributos si deseas limitar campos:
       attributes: [
         'id',
         'usuario_id',
@@ -335,18 +326,17 @@ router.get('/usuario/:usuario_id',
       ],
        include: [
         {
-          model: LineaDeAccion, // tu modelo de línea de acción
-          as: 'lineaAccion',  // alias según tu asociación
-          attributes: ['nombre_linea'] // o 'descripcion', según tu BD
+          model: LineaDeAccion,
+          as: 'lineaAccion', 
+          attributes: ['nombre_linea'] 
         }
       ]
     });
 
   if (trabajoSocial) {
-      // Convertir a objeto plano y aplanar el campo de línea de acción
       const plain = trabajoSocial.get({ plain: true });
       plain.linea_accion = plain.lineaAccion ? plain.lineaAccion.nombre_linea : '';
-      delete plain.lineaAccion; // Opcional: elimina el objeto anidado si no lo necesitas
+      delete plain.lineaAccion; 
       res.status(200).json(plain);
     } else {
       res.status(200).json(null);
@@ -438,8 +428,6 @@ router.get('/docente/:docente_id/nuevo',
 });
 
 
-
-
   // Ruta PUT para actualizar el estado del trabajo social
   router.put('/:id',
   authMiddleware,
@@ -448,15 +436,11 @@ router.get('/docente/:docente_id/nuevo',
     try {
       const { id } = req.params;
       const { estado_plan_labor_social, conformidad_plan_social } = req.body;
-
       const estadosValidos = ['pendiente', 'aceptado', 'rechazado'];
-
-      // Validación de campos requeridos
       if (!estado_plan_labor_social && !conformidad_plan_social) {
         return res.status(400).json({ message: 'Debe proporcionar al menos un campo para actualizar.' });
       }
 
-      // Validaciones de valores permitidos
       if (estado_plan_labor_social && !estadosValidos.includes(estado_plan_labor_social)) {
         return res.status(400).json({ message: 'Estado de plan inválido.' });
       }
@@ -465,35 +449,28 @@ router.get('/docente/:docente_id/nuevo',
         return res.status(400).json({ message: 'Estado de conformidad inválido.' });
       }
 
-      // Buscar el trabajo social
       const trabajoSocial = await TrabajoSocialSeleccionado.findOne({ where: { id } });
 
       if (!trabajoSocial) {
         return res.status(404).json({ message: 'Trabajo social no encontrado.' });
       }
 
-      // Preparar los campos a actualizar
       const camposActualizar = {};
       if (estado_plan_labor_social) camposActualizar.estado_plan_labor_social = estado_plan_labor_social;
       if (conformidad_plan_social) camposActualizar.conformidad_plan_social = conformidad_plan_social;
-
-      // 🔥 Si el docente rechaza, eliminar el archivo del plan social
       if (conformidad_plan_social === 'rechazado' && trabajoSocial.archivo_plan_social) {
         const rutaArchivo = path.join(__dirname, '..', 'uploads', 'planes_labor_social', trabajoSocial.archivo_plan_social);
 
         try {
           if (fs.existsSync(rutaArchivo)) {
-            await fs.promises.unlink(rutaArchivo); // elimina físicamente el archivo
+            await fs.promises.unlink(rutaArchivo); 
             console.log(`Archivo eliminado: ${rutaArchivo}`);
           }
-          camposActualizar.archivo_plan_social = null; // limpiar referencia en BD
+          camposActualizar.archivo_plan_social = null; 
         } catch (error) {
           console.error('⚠️ Error al eliminar archivo del plan social:', error);
-          // No detenemos la ejecución, solo notificamos
         }
       }
-
-      // Actualizar los campos en BD
       await trabajoSocial.update(camposActualizar);
 
       res.status(200).json({
@@ -507,8 +484,6 @@ router.get('/docente/:docente_id/nuevo',
     }
   });
 
-  
-// Ruta para generar y guardar automáticamente un PDF cuando el docente acepta el plan
 router.post('/generar-pdf/:id',
   authMiddleware,
   verificarRol('docente supervisor'),
@@ -528,11 +503,8 @@ router.post('/generar-pdf/:id',
       return res.status(404).json({ message: 'Trabajo social no encontrado' });
     }
 
-    // Crear nombre y ruta del archivo PDF
     const nombreArchivo = `carta_aceptacion_${trabajo.id}_${Date.now()}.pdf`;
     const rutaArchivo = path.join(__dirname, '../uploads/planes_labor_social', nombreArchivo);
-
-    // Crear el documento PDF
     const doc = new PDFDocument();
     doc.pipe(fs.createWriteStream(rutaArchivo));
 
@@ -543,8 +515,6 @@ router.post('/generar-pdf/:id',
     doc.text(`Labor social: ${trabajo.LaboresSociale?.nombre_labores || 'N/A'}`);
     doc.text(`Fecha de aceptación: ${new Date().toLocaleDateString()}`);
     doc.end();
-
-    // ❗ Cambiar aquí: guardar en carta_aceptacion_pdf
     await trabajo.update({ carta_aceptacion_pdf: nombreArchivo });
 
     res.status(200).json({
@@ -557,7 +527,6 @@ router.post('/generar-pdf/:id',
     res.status(500).json({ message: 'Error al generar PDF', error });
   }
 });
-// 📄 Ruta para ver o descargar el PDF generado
 router.get('/pdf/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -569,26 +538,16 @@ router.get('/pdf/:id', async (req, res) => {
     }
 
     const rutaPDF = path.join(__dirname, '../uploads/planes_labor_social', trabajo.carta_aceptacion_pdf);
-
-    // Verifica si el archivo existe
     if (!fs.existsSync(rutaPDF)) {
       return res.status(404).json({ message: 'Archivo PDF no existe en el servidor' });
     }
-
-    // 👉 Para abrir en el navegador:
     res.sendFile(rutaPDF);
-
-    // 👉 Si deseas que se descargue automáticamente en lugar de abrirse:
-    // res.download(rutaPDF);
-
   } catch (error) {
     console.error('Error al servir el PDF:', error);
     res.status(500).json({ message: 'Error interno al servir PDF', error });
   }
 });
 
-
- // Ruta para guardar el PDF generado en el frontend con html2pdf.js
 router.post('/guardar-pdf-html',
   authMiddleware,
   verificarRol('docente supervisor'),
@@ -669,10 +628,9 @@ router.post('/subir-plan-social',
       return res.status(404).json({ message: 'No se encontró trabajo social con ese usuario_id' });
     }
 
-    // ✅ Actualizamos el archivo Y el estado de conformidad
     await trabajo.update({
       archivo_plan_social: archivo,
-      conformidad_plan_social: 'pendiente' // ✅ Se asigna recién aquí cuando hace clic
+      conformidad_plan_social: 'pendiente' 
     });
 
     res.status(200).json({ message: 'Archivo subido correctamente y estado actualizado', archivo });
@@ -696,7 +654,6 @@ router.patch('/:id/solicitar-carta-termino',
       return res.status(404).json({ message: 'Trabajo no encontrado' });
     }
 
-    // Solo actualizar si no ha sido solicitada aún
     if (trabajo.solicitud_termino !== 'no_solicitada') {
       return res.status(400).json({ message: 'La solicitud ya fue enviada o está en revisión' });
     }
@@ -710,7 +667,7 @@ router.patch('/:id/solicitar-carta-termino',
     res.status(500).json({ message: 'Error al procesar la solicitud' });
   }
 });
-// PATCH: Aprobar o rechazar solicitud de carta de término (DOCENTE)
+
 router.patch('/:id/respuesta-carta-termino',
   authMiddleware,
   verificarRol('docente supervisor'),
@@ -730,8 +687,6 @@ router.patch('/:id/respuesta-carta-termino',
     if (!trabajo) {
       return res.status(404).json({ message: 'Trabajo social no encontrado' });
     }
-
-    // Solo permitir actualizar si fue previamente solicitada
     if (trabajo.solicitud_termino !== 'solicitada') {
       return res.status(400).json({ message: 'Aún no hay solicitud activa para responder' });
     }
@@ -747,6 +702,8 @@ router.patch('/:id/respuesta-carta-termino',
     res.status(500).json({ message: 'Error al actualizar estado de la solicitud', error });
   }
 });
+
+
 // 📩 Ruta para guardar PDF de carta de término generada desde el frontend
 router.post('/guardar-carta-termino',
   authMiddleware,
@@ -807,8 +764,8 @@ router.get('/informes-finales/programa/:programa_academico_id',
           'estado_informe_final',
           'createdAt',
           'certificado_final',
-          'tipo_servicio_social', // ✅ importante para certificados grupales
-          'usuario_id'             // ✅ necesario para distinguir al titular
+          'tipo_servicio_social', 
+          'usuario_id'            
         ]
       });
 
@@ -843,7 +800,7 @@ router.patch('/estado/:id',
 
     res.status(200).json({
       message: `Estado del informe actualizado a '${nuevo_estado}' correctamente`,
-      trabajo  // ← aquí corregido
+      trabajo  
     });
   } catch (error) {
     console.error('Error actualizando estado:', error);
@@ -851,7 +808,7 @@ router.patch('/estado/:id',
   }
 });
 
-// 📩 Ruta para guardar el certificado final generado desde React-PDF
+
 router.post('/guardar-certificado-final',
   authMiddleware,
   verificarRol('gestor-udh'),
@@ -881,6 +838,8 @@ router.post('/guardar-certificado-final',
     res.status(500).json({ message: 'Error interno al guardar certificado final', error });
   }
 });
+
+
 // Ruta para guardar el PDF de carta de término generado desde el frontend con html2pdf.js
 router.post('/guardar-carta-termino-html',
   authMiddleware,
@@ -914,6 +873,8 @@ router.post('/guardar-carta-termino-html',
     res.status(500).json({ message: 'Error al guardar PDF', error });
   }
 });
+
+
 // Ruta para servir el PDF generado
 router.get('/documentos-trabajo/:id', async (req, res) => {
   try {
@@ -989,8 +950,6 @@ router.get('/seguimiento/:id_estudiante',
   async (req, res) => {
   try {
     const { id_estudiante } = req.params;
-
-    // 1️⃣ Buscar primero al estudiante y su id_usuario
     const estudiante = await Estudiantes.findByPk(id_estudiante, {
       attributes: ['id_estudiante', 'id_usuario', 'nombre_estudiante', 'email'],
       include: [
@@ -1001,8 +960,6 @@ router.get('/seguimiento/:id_estudiante',
     if (!estudiante) {
       return res.status(404).json({ message: 'Estudiante no encontrado' });
     }
-
-    // 2️⃣ Buscar el trámite por id_usuario (que está en trabajo_social_seleccionado)
     const tramite = await TrabajoSocialSeleccionado.findOne({
       where: { usuario_id: estudiante.id_usuario },
       attributes: [
@@ -1012,8 +969,6 @@ router.get('/seguimiento/:id_estudiante',
         'estado_informe_final'
       ]
     });
-
-    // 3️⃣ Armar la respuesta final con tooltips incluidos
     const data = {
       estudiante: estudiante.nombre_estudiante,
       email: estudiante.email,
@@ -1059,8 +1014,6 @@ router.get(
   async (req, res) => {
     try {
       const { usuario_id } = req.params;
-
-      // Buscar el trabajo social correspondiente al usuario
       const trabajo = await TrabajoSocialSeleccionado.findOne({
         where: { usuario_id },
         attributes: ['id']
@@ -1072,10 +1025,9 @@ router.get(
         });
       }
 
-      // Buscar todos los cronogramas vinculados al trabajo social
       const cronogramas = await CronogramaActividades.findAll({
         where: { trabajo_social_id: trabajo.id },
-        attributes: ['id', 'actividad', 'fecha_fin_primero'], // ✅ Cambiado 'resultados' por 'actividad'
+        attributes: ['id', 'actividad', 'fecha_fin_primero'], 
         order: [['fecha_fin_primero', 'ASC']]
       });
 
@@ -1084,8 +1036,6 @@ router.get(
           message: 'No se encontraron cronogramas para este trabajo social.'
         });
       }
-
-      // Respuesta limpia
       res.status(200).json({
         message: 'Fechas obtenidas correctamente',
         total: cronogramas.length,
@@ -1102,7 +1052,109 @@ router.get(
   }
 );
 
+// 📌 DOCENTE CAMBIA LA DECISIÓN (ACEPTADO ↔ RECHAZADO) + OBSERVACIÓN
+router.post(
+  '/declinar',
+  authMiddleware,
+  verificarRol('docente supervisor'),
+  async (req, res) => {
+    try {
+      const { trabajo_id, observacion, nuevo_estado } = req.body;
 
+      if (!trabajo_id || !observacion || !nuevo_estado) {
+        return res
+          .status(400)
+          .json({ message: 'trabajo_id, nuevo_estado y observacion son obligatorios' });
+      }
+
+      if (!['aceptado', 'rechazado'].includes(nuevo_estado)) {
+        return res
+          .status(400)
+          .json({ message: 'nuevo_estado debe ser "aceptado" o "rechazado"' });
+      }
+      const trabajo = await TrabajoSocialSeleccionado.findByPk(trabajo_id);
+
+      if (!trabajo) {
+        return res
+          .status(404)
+          .json({ message: 'Trabajo social no encontrado' });
+      }
+
+      if (trabajo.conformidad_plan_social !== null) {
+        return res.status(400).json({
+          message: `Ya no se puede declinar porque la conformidad del plan social está en estado "${trabajo.conformidad_plan_social}".`
+        });
+      }
+
+      const estadoActual = trabajo.estado_plan_labor_social;
+      if (estadoActual === nuevo_estado) {
+        return res.status(400).json({
+          message: `El trabajo ya está en estado "${estadoActual}".`
+        });
+      }
+
+      if (estadoActual === 'aceptado' && nuevo_estado === 'rechazado') {
+        if (trabajo.carta_aceptacion_pdf) {
+          const rutaPDF = path.join(
+            __dirname,
+            '..',
+            'uploads',
+            'planes_labor_social',
+            trabajo.carta_aceptacion_pdf
+          );
+
+          try {
+            if (fs.existsSync(rutaPDF)) {
+              await fs.promises.unlink(rutaPDF);
+              console.log('🗑️ Carta de aceptación eliminada:', rutaPDF);
+            }
+          } catch (err) {
+            console.error('⚠️ Error al eliminar carta_aceptacion_pdf:', err);
+          }
+        }
+
+        await trabajo.update({
+          estado_plan_labor_social: 'rechazado',
+          carta_aceptacion_pdf: null
+        });
+      }
+
+      else if (estadoActual === 'rechazado' && nuevo_estado === 'aceptado') {
+        await trabajo.update({
+          estado_plan_labor_social: 'aceptado'
+        });
+      }
+
+      else {
+        return res.status(400).json({
+          message: `Transición de estado no permitida: ${estadoActual} → ${nuevo_estado}`
+        });
+      }
+
+      let usuarioId = null;
+      if (req.user) {
+        usuarioId = req.user.id || req.user.id_usuario || null;
+      }
+
+      await ObservacionTrabajoSocial.create({
+        trabajo_id: trabajo.id,
+        usuario_id: usuarioId,
+        tipo: 'cambio_estado', 
+        observacion
+      });
+
+      return res.status(200).json({
+        message: `Estado cambiado de "${estadoActual}" a "${nuevo_estado}" y observación registrada correctamente.`
+      });
+    } catch (error) {
+      console.error('❌ Error al cambiar estado del trabajo social:', error);
+      return res.status(500).json({
+        message: 'Error interno al cambiar estado del trabajo social',
+        error: error.message
+      });
+    }
+  }
+);
 
 
 router.put(
@@ -1111,22 +1163,18 @@ router.put(
   verificarRol('gestor-udh', 'docente supervisor'),
   async (req, res) => {
     try {
-      const { id } = req.params; // ID del registro del cronograma
+      const { id } = req.params; 
       const { fecha_fin_primero, resultados } = req.body;
-
-      // Validación básica
       if (!fecha_fin_primero) {
         return res.status(400).json({ message: 'La fecha_fin_primero es obligatoria.' });
       }
 
-      // Buscar el registro correspondiente
       const cronograma = await CronogramaActividades.findByPk(id);
 
       if (!cronograma) {
         return res.status(404).json({ message: 'No se encontró el cronograma con el ID especificado.' });
       }
 
-      // Actualizar campos
       cronograma.fecha_fin_primero = fecha_fin_primero;
       if (resultados) cronograma.resultados = resultados;
 
@@ -1161,7 +1209,7 @@ router.get(
             include: [
               {
                 model: ProgramasAcademicos,
-                as: 'programa', // 👈 usa el alias correcto definido en tu modelo Estudiantes
+                as: 'programa', 
                 attributes: ['id_programa', 'nombre_programa'],
               },
             ],
@@ -1173,7 +1221,7 @@ router.get(
         ],
         attributes: [
           'id',
-          'programa_academico_id', // 👈 lo incluimos también por si se usa en frontend
+          'programa_academico_id', 
           'docente_id',
           'usuario_id',
         ],
@@ -1188,7 +1236,7 @@ router.get(
           nombre_estudiante: plain.Estudiante?.nombre_estudiante || '—',
           asesor: plain.Docente?.nombre_docente || 'Sin asignar',
           programa_academico:
-            plain.Estudiante?.programa?.nombre_programa || '—', // ✅ nombre del programa del estudiante
+            plain.Estudiante?.programa?.nombre_programa || '—', 
         };
       });
 
@@ -1210,7 +1258,53 @@ router.get(
   }
 );
 
+// GET /api/trabajo-social/motivo-rechazo/:trabajoId
+router.get(
+  '/motivo-rechazo/:trabajoId',
+  authMiddleware,
+  verificarRol('alumno'),
+  async (req, res) => {
+    try {
+      const { trabajoId } = req.params;
 
+      const trabajo = await TrabajoSocialSeleccionado.findByPk(trabajoId);
+      if (!trabajo) {
+        return res.status(404).json({ message: 'Trabajo social no encontrado.' });
+      }
+
+      if (trabajo.estado_plan_labor_social !== 'rechazado') {
+        return res.status(400).json({
+          message: 'Este trabajo no se encuentra rechazado, no hay motivo que mostrar.'
+        });
+      }
+
+      const observacion = await ObservacionTrabajoSocial.findOne({
+        where: {
+          trabajo_id: trabajoId,
+          tipo: 'cambio_estado',
+        },
+        order: [['createdAt', 'DESC']],
+      });
+
+      if (!observacion) {
+        return res.status(404).json({
+          message: 'No se encontró un motivo de rechazo registrado.'
+        });
+      }
+
+      return res.json({
+        motivo: observacion.observacion,
+        fecha: observacion.createdAt,
+      });
+    } catch (error) {
+      console.error('❌ Error al obtener motivo de rechazo:', error);
+      return res.status(500).json({
+        message: 'Error interno al obtener el motivo de rechazo.',
+        error: error.message,
+      });
+    }
+  }
+);
 
 
 router.put(
@@ -1228,7 +1322,6 @@ router.put(
         });
       }
 
-      // 🔍 Buscar el registro del trabajo social seleccionado
       const trabajo = await TrabajoSocialSeleccionado.findByPk(id);
       if (!trabajo) {
         return res.status(404).json({
@@ -1236,7 +1329,6 @@ router.put(
         });
       }
 
-      // 🔍 Verificar que el nuevo docente exista
       const docenteExiste = await Docentes.findByPk(nuevo_docente_id);
       if (!docenteExiste) {
         return res.status(404).json({
@@ -1244,7 +1336,6 @@ router.put(
         });
       }
 
-      // ✏️ Actualizar el campo docente_id
       trabajo.docente_id = nuevo_docente_id;
       await trabajo.save();
 
