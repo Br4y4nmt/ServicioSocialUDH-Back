@@ -13,14 +13,9 @@ router.get('/perfil-estudiante/:correo', async (req, res) => {
   const codigoDesdeCorreo = correo.split('@')[0]; // Extraemos el código del correo
 
   try {
-    // Hacer la solicitud HTTP a la API externa de UDH
     const response = await axios.get(`http://www.udh.edu.pe/websauh/secretaria_general/gradosytitulos/datos_estudiante_json.aspx?_c_3456=${codigoDesdeCorreo}`);
-
     const data = response.data[0];
-
     const nombre_completo = `${data.stu_nombres || ''} ${data.stu_apellido_paterno || ''} ${data.stu_apellido_materno || ''}`.trim();
-
-    // Retornar los datos al frontend
     res.json({
       nombre_completo,
       dni: data.stu_dni || '',
@@ -103,6 +98,7 @@ router.post('/',
     }
   });
 
+  
 // Obtener todos los estudiantes
 router.get('/',
   authMiddleware,

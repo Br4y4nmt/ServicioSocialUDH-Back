@@ -2,11 +2,11 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middlewares/authMiddleware');
 const verificarRol = require('../middlewares/verificarRol');
-const Usuario = require('../models/Usuario'); // Asegúrate de tener el modelo Usuario correctamente configurado
+const Usuario = require('../models/Usuario');
 const bcrypt = require('bcrypt');
 const { Op } = require('sequelize');
 
-// Ruta para obtener un usuario por su ID (solo logueados)
+
 router.get('/',
   authMiddleware,
   verificarRol('gestor-udh','programa-academico'),
@@ -22,7 +22,8 @@ router.get('/',
     res.status(500).json({ message: 'Error al obtener usuario' });
   }
 });
-// Ruta para obtener todos los usuarios
+
+
 router.get('/:id',
   authMiddleware,
   verificarRol('gestor-udh', 'docente supervisor','programa-academico'),
@@ -35,7 +36,8 @@ router.get('/:id',
     res.status(500).json({ message: 'Error al obtener los usuarios' });
   }
 });
-// Ruta para eliminar un usuario por su ID (solo logueados)
+
+
 router.delete('/:id',
   authMiddleware,
   verificarRol('gestor-udh'),
@@ -52,7 +54,8 @@ router.delete('/:id',
     res.status(500).json({ message: 'Error al eliminar usuario' });
   }
 });
-// Ruta para editar un usuario por su ID (solo logueados)
+
+
 router.put('/:id',
   authMiddleware,
   verificarRol('gestor-udh'),
@@ -72,23 +75,22 @@ router.put('/:id',
   }
 });
 
-// Ruta para crear un nuevo usuario (solo logueados)
+
+
 router.post('/',
   authMiddleware,
   verificarRol('gestor-udh','programa-academico'),
   async (req, res) => {
-  const { email, dni, whatsapp } = req.body; // Asegúrate de recibir estos campos
+  const { email, dni, whatsapp } = req.body; 
 
-  // Validar si los campos están vacíos
   if (!email || !dni || !whatsapp) {
     return res.status(400).json({ message: 'Todos los campos son obligatorios' });
   }
 
   try {
-    // Verificar si el usuario ya existe con el mismo email o dni
     const usuarioExistente = await Usuario.findOne({
       where: {
-        [Op.or]: [{ email }, { dni }] // Verificar por email o dni duplicados
+        [Op.or]: [{ email }, { dni }] 
       }
     });
 
@@ -96,12 +98,11 @@ router.post('/',
       return res.status(400).json({ message: 'El usuario con ese email o DNI ya existe' });
     }
 
-    // Crear un nuevo usuario con rol_id 2 (docente)
     const nuevoUsuario = await Usuario.create({
       email,
       dni,
       whatsapp,
-      rol_id: 2 // rol_id automáticamente configurado como 2 para los docentes
+      rol_id: 2 
     });
 
     res.status(201).json({ message: 'Usuario creado exitosamente', nuevoUsuario });
@@ -110,7 +111,9 @@ router.post('/',
     res.status(500).json({ message: 'Error al crear usuario' });
   }
 });
-//Ruta para obtener un usuario específico por id_usuario
+
+
+
 router.get('/:id_usuario',
   authMiddleware,
   verificarRol('gestor-udh', 'docente supervisor','programa-academico'),
@@ -128,6 +131,7 @@ router.get('/:id_usuario',
     res.status(500).json({ message: 'Error al obtener el usuario' });
   }
 });
+
 
 router.get('/:id_usuario/primera-vez', async (req, res) => {
   try {

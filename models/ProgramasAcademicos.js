@@ -23,7 +23,7 @@ ProgramasAcademicos.init({
   },
   email: {
     type: DataTypes.STRING(255),
-    allowNull: true // o false si quieres que sea obligatorio
+    allowNull: true 
   },
   usuario_id: {
     type: DataTypes.INTEGER,

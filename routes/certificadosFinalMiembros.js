@@ -7,7 +7,6 @@ const { CertificadoFinalMiembro } = require('../models');
 const authMiddleware = require('../middlewares/authMiddleware');
 const verificarRol = require('../middlewares/verificarRol');
 
-// 📁 Configurar almacenamiento
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const dir = path.join(__dirname, '../uploads/certificados_finales_miembros');
@@ -17,13 +16,12 @@ const storage = multer.diskStorage({
     cb(null, dir);
   },
   filename: function (req, file, cb) {
-    cb(null, file.originalname); // 👈 ya generaste tú el nombre del PDF desde el frontend
+    cb(null, file.originalname); 
   }
 });
 
 const upload = multer({ storage });
 
-// 📤 Subir certificado de un miembro del grupo
 router.post('/',
   authMiddleware,
   verificarRol('docente supervisor', 'gestor-udh'),
@@ -45,13 +43,12 @@ router.post('/',
 
       res.status(201).json(nuevoCertificado);
     } catch (error) {
-      console.error('❌ Error al guardar certificado final del miembro:', error);
+      console.error('Error al guardar certificado final del miembro:', error);
       res.status(500).json({ error: 'Error interno al registrar certificado' });
     }
   }
 );
 
-// 📥 Obtener todos los certificados de miembros de un grupo
 router.get('/grupo/:trabajo_id',
   authMiddleware,
   verificarRol('alumno', 'docente supervisor', 'gestor-udh', 'programa-academico'),
@@ -65,7 +62,7 @@ router.get('/grupo/:trabajo_id',
 
       res.status(200).json(certificados);
     } catch (error) {
-      console.error('❌ Error al obtener certificados del grupo:', error);
+      console.error(' Error al obtener certificados del grupo:', error);
       res.status(500).json({ error: 'Error del servidor' });
     }
   }

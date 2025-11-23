@@ -6,7 +6,6 @@ const fs = require('fs');
 const { CartaAceptacion } = require('../models');
 const authMiddleware = require('../middlewares/authMiddleware');
 const verificarRol = require('../middlewares/verificarRol');
-// 📁 Configuración del almacenamiento
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const dir = path.join(__dirname, '../uploads/cartas_aceptacion');
@@ -16,13 +15,12 @@ const storage = multer.diskStorage({
     cb(null, dir);
   },
   filename: function (req, file, cb) {
-    cb(null, file.originalname); // se guarda como "carta_aceptacion_id_codigo.pdf"
+    cb(null, file.originalname); 
   }
 });
 
 const upload = multer({ storage });
 
-// 📤 Ruta para subir y registrar carta
 router.post('/',
   authMiddleware,
   verificarRol('docente supervisor', 'gestor-udh'),
@@ -44,11 +42,11 @@ router.post('/',
 
     res.status(201).json(nuevaCarta);
   } catch (error) {
-    console.error('❌ Error al guardar carta:', error);
+    console.error('Error al guardar carta:', error);
     res.status(500).json({ error: 'Error interno al registrar carta' });
   }
 });
-// routes/cartasAceptacion.js
+
 router.get('/grupo/:trabajo_id',
   authMiddleware,
   verificarRol('alumno', 'docente supervisor', 'gestor-udh', 'programa-academico'),

@@ -97,6 +97,7 @@ router.post('/register', async (req, res) => {
 
 
 
+
 router.post('/register-codigo', authMiddleware, async (req, res) => {
   const { codigo, whatsapp } = req.body;
 

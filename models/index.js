@@ -128,19 +128,18 @@ ProgramasAcademicos.hasMany(Docentes, {
   foreignKey: 'programa_academico_id',
   as: 'docentes'
 });
-// 🔹 Un trabajo social puede tener muchas observaciones
+
 TrabajoSocialSeleccionado.hasMany(ObservacionTrabajoSocial, {
   foreignKey: 'trabajo_id',
   as: 'observaciones'
 });
 
-// 🔹 Cada observación pertenece a un trabajo social
 ObservacionTrabajoSocial.belongsTo(TrabajoSocialSeleccionado, {
   foreignKey: 'trabajo_id',
   as: 'trabajo'
 });
 
-// (Opcional, pero útil) Relación con Usuario (autor de la observación)
+
 Usuario.hasMany(ObservacionTrabajoSocial, {
   foreignKey: 'usuario_id',
   as: 'observaciones'

@@ -16,7 +16,7 @@ Facultades.init({
 }, {
   sequelize,
   modelName: 'Facultades',
-  tableName: 'facultades', // Nombre de la tabla en la base de datos
+  tableName: 'facultades', 
   timestamps: false,
 });
 

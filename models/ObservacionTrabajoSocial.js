@@ -16,12 +16,11 @@ ObservacionTrabajoSocial.init(
     },
     usuario_id: {
       type: DataTypes.INTEGER,
-      allowNull: true // puede ser null si no quieres guardar el autor siempre
+      allowNull: true 
     },
     tipo: {
       type: DataTypes.STRING(50),
       allowNull: false,
-      // ejemplos: 'declinar', 'revision', 'otro'
       defaultValue: 'declinar'
     },
     observacion: {

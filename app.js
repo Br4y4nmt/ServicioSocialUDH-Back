@@ -71,6 +71,10 @@ app.use('/api/lineas', lineaDeAccionRoutes);
 const programasRoutes = require('./routes/programas');
 app.use('/api/programas', programasRoutes);
 
+
+const dashboardRoutes = require('./routes/dashboard');
+app.use('/api/dashboard', dashboardRoutes);
+
 const docentesRoutes = require('./routes/docentes');
 app.use('/api/docentes', docentesRoutes);
 
@@ -116,6 +120,7 @@ const syncDatabase = async () => {
   try {
     
     await Roles.sync();
+    await TrabajoSocialSeleccionado.sync();
     await Usuario.sync();
     await SystemConfig.sync();
     await Notificacion.sync();
@@ -123,7 +128,6 @@ const syncDatabase = async () => {
     await Docentes.sync();
     await ObservacionTrabajoSocial.sync();
     await LaboresSociales.sync();
-    await TrabajoSocialSeleccionado.sync();
     await Facultades.sync();
     await CertificadoFinalMiembro.sync();
     await CronogramaActividad.sync();

@@ -6,7 +6,7 @@ const authMiddleware = require('../middlewares/authMiddleware');
 const path = require('path');
 const fs = require('fs');
 const verificarRol = require('../middlewares/verificarRol');
-// Obtener cronograma por usuario
+
 router.get('/:usuario_id',
   authMiddleware,
   verificarRol('alumno', 'docente supervisor', 'gestor-udh', 'programa-academico'),
@@ -46,14 +46,12 @@ router.post('/evidencia/:actividad_id',
       return res.status(404).json({ message: 'Actividad no encontrada' });
     }
 
-    // 🚫 Bloqueo si el plan aún no está aceptado por el docente
     if (!actividad.trabajoSocial || actividad.trabajoSocial.estado_plan_labor_social !== 'aceptado') {
       return res.status(403).json({
         message: 'No puedes subir evidencias porque tu plan aún no ha sido aceptado por el docente.'
       });
     }
 
-    // 🚫 Bloqueo si ya fue enviada o aprobada la carta de término
     if (
       actividad.trabajoSocial.estado_carta === 'solicitada' ||
       actividad.trabajoSocial.estado_carta === 'aprobada'
@@ -63,12 +61,10 @@ router.post('/evidencia/:actividad_id',
       });
     }
 
-    // 🚫 Ya existe evidencia para esta actividad
     if (actividad.evidencia) {
       return res.status(400).json({ message: 'Ya existe una evidencia para esta actividad.' });
     }
 
-    // ✅ Validación de rango de fecha
     const fechaActual = new Date();
     const fechaPermitida = new Date(actividad.fecha_fin_primero);
     const fechaMinima = new Date(fechaPermitida);
@@ -87,8 +83,7 @@ router.post('/evidencia/:actividad_id',
       });
     }
 
-    // ✅ Guardado de evidencia
-    actividad.fecha_fin = fechaActual.toISOString().split('T')[0]; // fecha del servidor
+    actividad.fecha_fin = fechaActual.toISOString().split('T')[0];
     if (estado) actividad.estado = estado;
     actividad.evidencia = req.file.filename;
 
@@ -108,8 +103,6 @@ router.post('/evidencia/:actividad_id',
 });
 
 
-
-// Obtener cronograma por ID de trabajo social
 router.get('/trabajo/:trabajo_social_id',
   authMiddleware,
   verificarRol('alumno', 'docente supervisor', 'gestor-udh', 'programa-academico'),
@@ -128,7 +121,6 @@ router.get('/trabajo/:trabajo_social_id',
   }
 });
 
-// Guardar cronograma completo
 router.post('/:usuario_id',
   authMiddleware,
   verificarRol('alumno'),
@@ -140,10 +132,8 @@ router.post('/:usuario_id',
     const trabajo = await TrabajoSocialSeleccionado.findOne({ where: { usuario_id } });
     if (!trabajo) return res.status(404).json({ message: 'Trabajo no encontrado' });
 
-    // Eliminar anteriores
     await CronogramaActividad.destroy({ where: { trabajo_social_id: trabajo.id } });
 
-    // Insertar nuevos
     const nuevas = actividades.map((a) => ({
       trabajo_social_id: trabajo.id,
       actividad: a.actividad,
@@ -197,7 +187,7 @@ router.get('/trabajo/:trabajo_social_id',
       where: { trabajo_social_id }
     });
 
-    res.json(actividades); // actividades incluirá 'estado' y 'observacion'
+    res.json(actividades); 
   } catch (error) {
     res.status(500).json({ message: 'Error al obtener cronograma' });
   }
@@ -214,13 +204,11 @@ router.delete('/evidencia/:actividad_id',
         return res.status(404).json({ message: 'Actividad no encontrada' });
       }
 
-      // Verificamos si hay evidencia previa
       if (actividad.evidencia) {
         const rutaArchivo = path.join(__dirname, '..', 'uploads', 'evidencias', actividad.evidencia);
         if (fs.existsSync(rutaArchivo)) {
-          fs.unlinkSync(rutaArchivo); // Elimina del sistema de archivos
+          fs.unlinkSync(rutaArchivo); 
         }
-        // Limpiar campos de evidencia en la base de datos
         actividad.evidencia = null;
         actividad.fecha_fin = null;
         actividad.estado = null;
@@ -247,7 +235,7 @@ router.patch('/:id/observacion',
       return res.status(404).json({ message: 'Actividad no encontrada' });
     }
 
-    actividad.estado = 'observado'; // También marcamos como observado
+    actividad.estado = 'observado';
     actividad.observacion = observacion;
     await actividad.save();
 

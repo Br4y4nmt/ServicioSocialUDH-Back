@@ -6,11 +6,11 @@ const path = require('path');
 const fs = require('fs');
 const Docentes = require('../models/Docentes');
 const Facultades = require('../models/Facultades');
-const ProgramasAcademicos = require('../models/ProgramasAcademicos'); // Para incluir el nombre del programa
+const ProgramasAcademicos = require('../models/ProgramasAcademicos'); 
 const Usuario = require('../models/Usuario');
 const authMiddleware = require('../middlewares/authMiddleware');
 const verificarRol = require('../middlewares/verificarRol');
-// 📁 Configuración de almacenamiento de archivos (firma)
+
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const dir = path.join(__dirname, '../uploads/firmas');
@@ -50,13 +50,11 @@ router.get('/perfil', authMiddleware, async (req, res) => {
       ]
     });
 
-    // 4) Resultado
     if (!docente) {
       console.warn('⚠️  Docente NO encontrado para id_usuario:', idUsuario);
       return res.status(404).json({ message: 'Docente no encontrado' });
     }
 
-    // 5) Respuesta
     res.json({
       dni: docente.dni,
       celular: docente.celular,
@@ -82,10 +80,9 @@ router.put(
         nombre_docente,
         celular,
         id_usuario,
-        dni // ✅ Añadido
+        dni 
       } = req.body;
 
-      // Validación básica
       if (!dni || !/^\d{8}$/.test(dni)) {
         return res.status(400).json({ message: 'DNI inválido. Debe tener exactamente 8 dígitos.' });
       }
@@ -95,11 +92,10 @@ router.put(
         return res.status(404).json({ message: 'Docente no encontrado' });
       }
 
-      // Validar si ya existe otro docente con el mismo DNI
       const otroDocente = await Docentes.findOne({
         where: {
           dni,
-          id_docente: { [Op.ne]: docente.id_docente } // distinto del actual
+          id_docente: { [Op.ne]: docente.id_docente }
         }
       });
 
@@ -107,10 +103,9 @@ router.put(
         return res.status(409).json({ message: 'Ya existe un docente con este DNI' });
       }
 
-      // Actualizar campos
       docente.nombre_docente = nombre_docente;
       docente.celular = celular;
-      docente.dni = dni; // ✅ Se guarda el DNI actualizado
+      docente.dni = dni; 
 
       if (req.file) {
         docente.firma_digital = req.file.filename;
@@ -118,7 +113,6 @@ router.put(
 
       await docente.save();
 
-      // Si es la primera vez, marcar como completado
       const usuario = await Usuario.findByPk(id_usuario);
       if (usuario && usuario.primera_vez === true) {
         usuario.primera_vez = false;
@@ -134,7 +128,6 @@ router.put(
   }
 );
 
-// Ruta para crear un nuevo docente
 router.post('/',
   authMiddleware,
   verificarRol('gestor-udh', 'programa-academico', 'docente supervisor'),
@@ -159,7 +152,6 @@ router.post('/',
       firma_digital
     });
 
-    // 🔄 Cambiar campo primera_vez a false
     const usuario = await Usuario.findByPk(id_usuario);
     if (usuario && usuario.primera_vez === true) {
       usuario.primera_vez = false;
@@ -172,8 +164,7 @@ router.post('/',
     res.status(500).json({ message: 'Error al registrar docente', error });
   }
 });
-  
-// Obtener todos los docentes
+
   router.get('/',
   authMiddleware,
   verificarRol('gestor-udh', 'programa-academico', 'docente supervisor', 'alumno'),
@@ -183,12 +174,12 @@ router.post('/',
       include: [
         {
           model: ProgramasAcademicos,
-          as: 'ProgramaDelDocente', // 👈 usa alias
+          as: 'ProgramaDelDocente', 
           attributes: ['nombre_programa']
         },
         {
           model: Facultades,
-          as: 'Facultade', // 👈 usa alias exacto
+          as: 'Facultade', 
           attributes: ['nombre_facultad']
         }
       ]
@@ -201,7 +192,6 @@ router.post('/',
 });
 
 
-// Obtener un docente por ID
 router.get('/:id_docente',
   authMiddleware,
   verificarRol('gestor-udh', 'programa-academico', 'docente supervisor', 'alumno'),
@@ -233,7 +223,6 @@ router.get('/por-programa/:usuario_id',
   try {
     const { usuario_id } = req.params;
 
-    // 1. Buscar el programa asociado a este usuario
     const programa = await ProgramasAcademicos.findOne({
       where: { usuario_id }
     });
@@ -242,18 +231,17 @@ router.get('/por-programa/:usuario_id',
       return res.status(404).json({ message: 'No se encontró el programa académico para este usuario' });
     }
 
-    // 2. Buscar docentes que tengan ese programa
     const docentes = await Docentes.findAll({
       where: { programa_academico_id: programa.id_programa },
       include: [
         {
           model: ProgramasAcademicos,
-          as: 'ProgramaDelDocente', // ✅ alias correcto
+          as: 'ProgramaDelDocente', 
           attributes: ['nombre_programa']
         },
         {
           model: Facultades,
-          as: 'Facultade', // ✅ alias correcto
+          as: 'Facultade', 
           attributes: ['nombre_facultad']
         }
       ]
@@ -279,9 +267,8 @@ router.put('/:id_docente',
 
       const { nombre_docente, programa_academico_id, facultad_id, email } = req.body;
 
-      // Validar si el nuevo correo ya está en uso por otro usuario
       if (email) {
-        const usuarioExistente = await Usuario.findOne({ // <-- CORREGIDO
+        const usuarioExistente = await Usuario.findOne({ 
           where: {
             email,
             id_usuario: { [Op.ne]: docente.id_usuario }
@@ -295,7 +282,6 @@ router.put('/:id_docente',
         }
       }
 
-      // ✅ Actualizar DOCENTE
       await docente.update({
         nombre_docente,
         programa_academico_id,
@@ -303,7 +289,6 @@ router.put('/:id_docente',
         email
       });
 
-      // ✅ Actualizar USUARIO
       if (email && docente.id_usuario) {
         const usuario = await Usuario.findByPk(docente.id_usuario);
         if (usuario) {
@@ -336,10 +321,8 @@ router.delete('/:id_docente',
 
       const usuarioId = docente.id_usuario;
 
-      // Eliminar primero el docente
       await docente.destroy();
 
-      // Eliminar el usuario relacionado
       if (usuarioId) {
         const usuario = await Usuario.findByPk(usuarioId);
         if (usuario) {
@@ -357,7 +340,7 @@ router.delete('/:id_docente',
 );
 
 
-// Obtener id_docente y firma_digital desde id_usuario
+
 router.get('/usuario/:usuario_id',
   authMiddleware,
   verificarRol('gestor-udh', 'programa-academico', 'docente supervisor', 'alumno'),
@@ -367,17 +350,16 @@ router.get('/usuario/:usuario_id',
 
     const docente = await Docentes.findOne({
       where: { id_usuario: usuario_id },
-      attributes: ['id_docente', 'firma_digital']  // 👈 Asegúrate de incluir este campo
+      attributes: ['id_docente', 'firma_digital']  
     });
 
     if (!docente) {
       return res.status(404).json({ message: 'Docente no encontrado' });
     }
 
-    // Devuelve ambos campos
     res.status(200).json({
       id_docente: docente.id_docente,
-      firma: docente.firma_digital  // 👈 Usa este nombre porque así lo consumes en el frontend
+      firma: docente.firma_digital 
     });
 
   } catch (error) {
@@ -385,26 +367,26 @@ router.get('/usuario/:usuario_id',
     res.status(500).json({ message: 'Error al obtener docente' });
   }
 });
-// Obtener docentes de un programa académico específico por ID
+
+
 router.get('/programa/:programa_id',
   authMiddleware,
   verificarRol('gestor-udh', 'programa-academico', 'docente supervisor', 'alumno'),
   async (req, res) => {
-    const { programa_id } = req.params;  // Obtenemos el ID del programa desde los parámetros de la URL
+    const { programa_id } = req.params;  
     
     try {
-      // Filtramos los docentes por el ID del programa académico
+
       const docentes = await Docentes.findAll({
         where: {
-          programa_academico_id: programa_id,  // Solo docentes del programa con ID `programa_id`
+          programa_academico_id: programa_id,  
         },
         include: {
           model: ProgramasAcademicos,
-          attributes: ['nombre_programa'], // Incluir el nombre del programa académico
+          attributes: ['nombre_programa'], 
         }
       });
-  
-      // Si hay docentes, respondemos con los datos
+
       if (docentes.length > 0) {
         res.status(200).json(docentes);
       } else {
@@ -415,6 +397,8 @@ router.get('/programa/:programa_id',
       res.status(500).json({ message: 'Error al obtener docentes del programa', error });
     }
   });
+
+
 router.get('/datos/usuario/:usuario_id',
   authMiddleware,
   verificarRol('gestor-udh', 'programa-academico', 'docente supervisor'),
@@ -427,12 +411,12 @@ router.get('/datos/usuario/:usuario_id',
         include: [
           {
             model: Facultades,
-            as: 'Facultade', // 👈 ALIAS definido en el modelo
+            as: 'Facultade', 
             attributes: ['id_facultad', 'nombre_facultad']
           },
           {
             model: ProgramasAcademicos,
-            as: 'ProgramaDelDocente', // 👈 ALIAS definido en el modelo
+            as: 'ProgramaDelDocente', 
             attributes: ['id_programa', 'nombre_programa']
           }
         ]
@@ -449,7 +433,8 @@ router.get('/datos/usuario/:usuario_id',
     }
   }
 );
-// Actualizar el celular del docente por id_usuario
+
+
 router.put('/actualizar-celular/:id_usuario',
   authMiddleware,
   verificarRol('docente supervisor', 'gestor-udh', 'programa-academico'),
@@ -474,58 +459,53 @@ router.put('/actualizar-celular/:id_usuario',
   }
 });
 router.get('/docente/:id', async (req, res) => {
-  const idDocente = req.params.id; // Obtenemos el id_docente desde la URL
+  const idDocente = req.params.id; 
 
   try {
-    // Buscar el docente por id_docente
     const docente = await Docentes.findOne({
       where: { id_docente: idDocente },
     });
 
-    // Si no encontramos el docente
     if (!docente) {
       return res.status(404).json({ message: 'Docente no encontrado' });
     }
 
-    // Retornamos los datos del docente
     res.json(docente);
   } catch (error) {
     console.error('Error al obtener docente:', error);
     res.status(500).json({ message: 'Error al obtener docente', error: error.message });
   }
 });
+
+
 router.get('/verificar-docente/:id_docente', async (req, res) => {
   const { id_docente } = req.params;
 
   try {
-    // Buscar el docente por su id_docente
     const docente = await Docentes.findOne({
       where: { id_docente },
       include: [
         {
-          model: Usuario,  // Sin alias
-          attributes: ['id_usuario', 'email', 'dni', 'whatsapp']  // Campos que deseas obtener del usuario
+          model: Usuario,  
+          attributes: ['id_usuario', 'email', 'dni', 'whatsapp']  
         }
       ]
     });
 
-    // Si no se encuentra el docente, devolver un error
     if (!docente) {
       return res.status(404).json({ message: 'Docente no encontrado' });
     }
 
-    // Si se encuentra el docente, devolver los datos del docente y del usuario asociado
     res.status(200).json({
       message: 'Docente encontrado',
-      docente: docente,  // El objeto completo del docente
-      usuario_id: docente.Usuario.id_usuario,  // El id_usuario asociado al docente
-      usuario_email: docente.Usuario.email,    // El email del usuario asociado
-      usuario_dni: docente.Usuario.dni,        // El DNI del usuario asociado
-      usuario_whatsapp: docente.Usuario.whatsapp // El whatsapp del usuario asociado
+      docente: docente,  
+      usuario_id: docente.Usuario.id_usuario,  
+      usuario_email: docente.Usuario.email,   
+      usuario_dni: docente.Usuario.dni,        
+      usuario_whatsapp: docente.Usuario.whatsapp 
     });
 
   } catch (error) {
-    // Si ocurre un error, devolver un mensaje de error
     console.error('Error al verificar el docente:', error);
     res.status(500).json({ message: 'Error al verificar el docente', error: error.message });
   }
@@ -542,8 +522,6 @@ router.get(
   async (req, res) => {
     try {
       const { id_programa } = req.params;
-
-      // Buscar docentes que pertenecen a ese programa
       const docentes = await Docentes.findAll({
         where: { programa_academico_id: id_programa },
         include: [
@@ -573,7 +551,7 @@ router.get(
         data: docentes
       });
     } catch (error) {
-      console.error('❌ Error al obtener docentes por programa:', error);
+      console.error('Error al obtener docentes por programa:', error);
       res.status(500).json({
         message: 'Error interno al obtener docentes por programa',
         error: error.message

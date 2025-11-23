@@ -1,6 +1,6 @@
 const { Model, DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
-const LineaDeAccion = require('./LineaDeAccion'); // ✅ Importar el nuevo modelo
+const LineaDeAccion = require('./LineaDeAccion'); 
 
 class LaboresSociales extends Model {}
 
@@ -14,7 +14,7 @@ LaboresSociales.init({
     type: DataTypes.STRING(255),
     allowNull: false,
   },
-  linea_accion_id: {  // ✅ Nueva clave foránea
+  linea_accion_id: { 
     type: DataTypes.INTEGER,
     allowNull: false,
     references: {

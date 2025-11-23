@@ -1,4 +1,3 @@
-// models/IntegranteGrupo.js
 const { Model, DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 
@@ -17,7 +16,7 @@ IntegranteGrupo.init({
       model: 'trabajo_social_seleccionado',
       key: 'id'
     },
-    onDelete: 'CASCADE' // si se elimina el trabajo social, se eliminan sus integrantes
+    onDelete: 'CASCADE' 
   },
   correo_institucional: {
     type: DataTypes.STRING,

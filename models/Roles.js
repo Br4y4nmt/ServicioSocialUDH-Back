@@ -16,8 +16,8 @@ Roles.init({
 }, {
   sequelize,
   modelName: 'Roles',
-  tableName: 'roles',  // MUY IMPORTANTE: para que apunte a la tabla correcta
-  timestamps: false,   // No tienes columnas createdAt ni updatedAt
+  tableName: 'roles',  
+  timestamps: false,   
 });
 
 module.exports = Roles;

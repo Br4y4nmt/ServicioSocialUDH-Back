@@ -385,7 +385,8 @@ router.get('/docente/:docente_id',
 
   
 
-router.get('/docente/:docente_id/nuevo',
+router.get(
+  '/docente/:docente_id/nuevo',
   authMiddleware,
   verificarRol('docente supervisor', 'gestor-udh'),
   async (req, res) => {
@@ -395,10 +396,9 @@ router.get('/docente/:docente_id/nuevo',
       const trabajosSociales = await TrabajoSocialSeleccionado.findAll({
         where: {
           docente_id,
-          // Solo registros con conformidad en 'pendiente'
-          conformidad_plan_social: 'pendiente',               // <- filtro clave
-          // Si tienes valores con mayúsculas/mixtos, usa una de estas dos opciones:
-          // [Op.and]: [sequelize.where(sequelize.fn('LOWER', sequelize.col('conformidad_plan_social')), 'pendiente')],
+          conformidad_plan_social: {
+            [Op.in]: ['pendiente', 'aceptado']   
+          }
         },
         include: [
           { model: ProgramasAcademicos, attributes: ['nombre_programa'] },
@@ -417,15 +417,19 @@ router.get('/docente/:docente_id/nuevo',
           'tipo_servicio_social',
           'solicitud_termino',
           'estado_informe_final'
-        ]
+        ],
+        order: [['createdAt', 'DESC']]
       });
 
       res.status(200).json(trabajosSociales);
     } catch (error) {
       console.error('Error al obtener trabajos sociales de docente:', error);
-      res.status(500).json({ message: 'Error al obtener trabajos sociales de docente', error });
+      res
+        .status(500)
+        .json({ message: 'Error al obtener trabajos sociales de docente', error });
     }
-});
+  }
+);
 
 
   // Ruta PUT para actualizar el estado del trabajo social
@@ -479,7 +483,7 @@ router.get('/docente/:docente_id/nuevo',
       });
 
     } catch (error) {
-      console.error('❌ Error al actualizar el trabajo social:', error);
+      console.error('Error al actualizar el trabajo social:', error);
       res.status(500).json({ message: 'Error interno al actualizar el trabajo social.', error });
     }
   });
@@ -565,8 +569,6 @@ router.post('/guardar-pdf-html',
     if (!trabajo) {
       return res.status(404).json({ message: 'Trabajo social no encontrado' });
     }
-
-    // Guardar nombre del archivo en la columna `carta_aceptacion_pdf`
     await trabajo.update({
       carta_aceptacion_pdf: req.file.filename
     });
@@ -581,7 +583,9 @@ router.post('/guardar-pdf-html',
     res.status(500).json({ message: 'Error al guardar el PDF', error });
   }
 });
-// ✅ Ruta para obtener un trabajo social por su ID
+
+
+
 router.get('/:id',
   authMiddleware,
   verificarRol('alumno', 'docente supervisor', 'gestor-udh'),
@@ -608,7 +612,8 @@ router.get('/:id',
   }
 });
 
-  // Ruta POST para subir archivo del plan social
+
+
 router.post('/subir-plan-social',
   authMiddleware,
   verificarRol('alumno'),
@@ -640,7 +645,8 @@ router.post('/subir-plan-social',
   }
 });
 
-// PATCH: Solicitar carta de término (alumno)
+
+
 router.patch('/:id/solicitar-carta-termino',
   authMiddleware,
   verificarRol('alumno'),
@@ -667,6 +673,8 @@ router.patch('/:id/solicitar-carta-termino',
     res.status(500).json({ message: 'Error al procesar la solicitud' });
   }
 });
+
+
 
 router.patch('/:id/respuesta-carta-termino',
   authMiddleware,
@@ -704,7 +712,7 @@ router.patch('/:id/respuesta-carta-termino',
 });
 
 
-// 📩 Ruta para guardar PDF de carta de término generada desde el frontend
+
 router.post('/guardar-carta-termino',
   authMiddleware,
   verificarRol('docente supervisor'),
@@ -776,6 +784,8 @@ router.get('/informes-finales/programa/:programa_academico_id',
     }
   });
 
+
+
 router.patch('/estado/:id',
   authMiddleware,
   verificarRol('docente supervisor', 'gestor-udh', 'programa-academico'),
@@ -840,7 +850,6 @@ router.post('/guardar-certificado-final',
 });
 
 
-// Ruta para guardar el PDF de carta de término generado desde el frontend con html2pdf.js
 router.post('/guardar-carta-termino-html',
   authMiddleware,
   verificarRol('docente supervisor'),
@@ -875,22 +884,17 @@ router.post('/guardar-carta-termino-html',
 });
 
 
-// Ruta para servir el PDF generado
 router.get('/documentos-trabajo/:id', async (req, res) => {
   try {
     const { id } = req.params;
-
-    // 👉 Verifica si el id tiene "_", lo que indica que es un miembro del grupo
     const esMiembro = id.includes('_');
 
     let rutaPDF;
 
     if (esMiembro) {
-      // Ejemplo: id = "143_2019110519"
       const nombreArchivo = `carta_aceptacion_${id}.pdf`;
       rutaPDF = path.join(__dirname, '../uploads/cartas_aceptacion', nombreArchivo);
     } else {
-      // Documento del estudiante principal
       const trabajo = await TrabajoSocialSeleccionado.findByPk(id);
       if (!trabajo || !trabajo.carta_aceptacion_pdf) {
         return res.status(404).json({ message: 'Archivo no encontrado para este trabajo social' });
@@ -911,7 +915,9 @@ router.get('/documentos-trabajo/:id', async (req, res) => {
     res.status(500).json({ message: 'Error interno al servir PDF', error });
   }
 });
-// Ruta para servir el PDF de cartas de término
+
+
+
 router.get('/documento-termino/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -939,10 +945,12 @@ router.get('/documento-termino/:id', async (req, res) => {
     res.sendFile(rutaPDF);
 
   } catch (error) {
-    console.error('❌ Error al servir carta de término:', error);
+    console.error('Error al servir carta de término:', error);
     res.status(500).json({ message: 'Error interno al servir PDF de término', error });
   }
 });
+
+
 
 router.get('/seguimiento/:id_estudiante',
   authMiddleware,
@@ -1052,7 +1060,8 @@ router.get(
   }
 );
 
-// 📌 DOCENTE CAMBIA LA DECISIÓN (ACEPTADO ↔ RECHAZADO) + OBSERVACIÓN
+
+
 router.post(
   '/declinar',
   authMiddleware,
@@ -1157,6 +1166,7 @@ router.post(
 );
 
 
+
 router.put(
   '/actualizar-fecha/:id',
   authMiddleware,
@@ -1185,7 +1195,7 @@ router.put(
         cronograma,
       });
     } catch (error) {
-      console.error('❌ Error al actualizar la fecha:', error);
+      console.error('Error al actualizar la fecha:', error);
       res.status(500).json({ message: 'Error interno al actualizar la fecha', error });
     }
   }
@@ -1249,7 +1259,7 @@ router.get(
         data,
       });
     } catch (error) {
-      console.error('❌ Error al obtener trabajos sociales con detalle:', error);
+      console.error('Error al obtener trabajos sociales con detalle:', error);
       res.status(500).json({
         message: 'Error interno al obtener trabajos sociales con detalle',
         error: error.message,
@@ -1258,7 +1268,8 @@ router.get(
   }
 );
 
-// GET /api/trabajo-social/motivo-rechazo/:trabajoId
+
+
 router.get(
   '/motivo-rechazo/:trabajoId',
   authMiddleware,
@@ -1297,7 +1308,7 @@ router.get(
         fecha: observacion.createdAt,
       });
     } catch (error) {
-      console.error('❌ Error al obtener motivo de rechazo:', error);
+      console.error('Error al obtener motivo de rechazo:', error);
       return res.status(500).json({
         message: 'Error interno al obtener el motivo de rechazo.',
         error: error.message,
@@ -1305,6 +1316,7 @@ router.get(
     }
   }
 );
+
 
 
 router.put(
@@ -1348,7 +1360,7 @@ router.put(
         },
       });
     } catch (error) {
-      console.error('❌ Error al actualizar el asesor:', error);
+      console.error('Error al actualizar el asesor:', error);
       res.status(500).json({
         message: 'Error interno al actualizar el asesor.',
         error: error.message,
