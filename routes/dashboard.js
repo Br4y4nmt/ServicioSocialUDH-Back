@@ -5,6 +5,7 @@ const Estudiantes = require("../models/Estudiantes");
 const Facultades = require("../models/Facultades");
 const ProgramasAcademicos = require("../models/ProgramasAcademicos");
 const TrabajoSocialSeleccionado = require("../models/TrabajoSocialSeleccionado");
+const IntegranteGrupo = require("../models/IntegranteGrupo");
 const LineaDeAccion = require("../models/LineaDeAccion");
 const authMiddleware = require("../middlewares/authMiddleware");
 const verificarRol = require("../middlewares/verificarRol");
@@ -103,24 +104,64 @@ router.get(
   verificarRol("gestor-udh"),
   async (req, res) => {
     try {
-      const total = await TrabajoSocialSeleccionado.count({
+      const trabajos = await TrabajoSocialSeleccionado.findAll({
         where: {
           certificado_final: {
             [Op.ne]: null,
           },
           estado_informe_final: "aprobado",
         },
+        attributes: ["id", "tipo_servicio_social"],
+        raw: true,
       });
+
+      if (!trabajos.length) {
+        return res.json({ total: 0 });
+      }
+      const trabajosIndividuales = trabajos.filter(
+        (t) => t.tipo_servicio_social === "individual"
+      );
+      const trabajosGrupales = trabajos.filter(
+        (t) => t.tipo_servicio_social === "grupal"
+      );
+
+      const idsGrupales = trabajosGrupales.map((t) => t.id);
+      let totalIntegrantesGrupales = 0;
+
+      if (idsGrupales.length > 0) {
+        const integrantes = await IntegranteGrupo.findAll({
+          attributes: [
+            "trabajo_social_id",
+            [fn("COUNT", col("id_integrante")), "total"],
+          ],
+          where: {
+            trabajo_social_id: idsGrupales,
+          },
+          group: ["trabajo_social_id"],
+          raw: true,
+        });
+
+        totalIntegrantesGrupales = integrantes.reduce(
+          (sum, item) => sum + Number(item.total || 0),
+          0
+        );
+      }
+      const totalIndividuales = trabajosIndividuales.length;
+      const totalTitularesGrupales = trabajosGrupales.length;
+
+      const total =
+        totalIndividuales + totalTitularesGrupales + totalIntegrantesGrupales;
 
       res.json({ total });
     } catch (error) {
       console.error("Error total certificados finales:", error);
-      res
-        .status(500)
-        .json({ message: "Error al obtener total de certificados finales" });
+      res.status(500).json({
+        message: "Error al obtener total de certificados finales",
+      });
     }
   }
 );
+
 
 
 router.get(
