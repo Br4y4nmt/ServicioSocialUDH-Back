@@ -8,11 +8,9 @@ const TrabajoSocialSeleccionado = require("../models/TrabajoSocialSeleccionado")
 const LineaDeAccion = require("../models/LineaDeAccion");
 const authMiddleware = require("../middlewares/authMiddleware");
 const verificarRol = require("../middlewares/verificarRol");
-const { fn, col } = require("sequelize");
+const { fn, col, Op } = require("sequelize");
 
-// ===============================
-//  1️⃣ TOTAL DE ESTUDIANTES
-// ===============================
+
 router.get("/total-estudiantes",
   authMiddleware,
   verificarRol("gestor-udh"),
@@ -23,6 +21,103 @@ router.get("/total-estudiantes",
     } catch (error) {
       console.log("Error total estudiantes:", error);
       res.status(500).json({ message: "Error al obtener total de estudiantes" });
+    }
+  }
+);
+
+router.get(
+  "/alumnos-por-mes",
+  authMiddleware,
+  verificarRol("gestor-udh"),
+  async (req, res) => {
+    try {
+      const hoy = new Date();
+      const fechaInicio = new Date(hoy.getFullYear(), hoy.getMonth() - 5, 1);
+
+      const rows = await TrabajoSocialSeleccionado.findAll({
+        attributes: [
+          [fn("YEAR", col("createdAt")), "anio"],
+          [fn("MONTH", col("createdAt")), "mes"],
+          [fn("COUNT", col("id")), "total"],
+        ],
+        where: {
+          estado_plan_labor_social: "aceptado",
+          createdAt: {
+            [Op.gte]: fechaInicio,
+          },
+        },
+        group: [
+          fn("YEAR", col("createdAt")),
+          fn("MONTH", col("createdAt")),
+        ],
+        order: [
+          [fn("YEAR", col("createdAt")), "ASC"],
+          [fn("MONTH", col("createdAt")), "ASC"],
+        ],
+        raw: true,
+      });
+
+      res.json(
+        rows.map((r) => ({
+          anio: Number(r.anio),
+          mes: Number(r.mes),
+          total: Number(r.total),
+        }))
+      );
+    } catch (error) {
+      console.error("Error alumnos por mes:", error);
+      res
+        .status(500)
+        .json({ message: "Error al obtener alumnos por mes" });
+    }
+  }
+);
+
+
+router.get(
+  "/total-trabajos-sociales-activos",
+  authMiddleware,
+  verificarRol("gestor-udh"),
+  async (req, res) => {
+    try {
+      const total = await TrabajoSocialSeleccionado.count({
+        where: {
+          estado_plan_labor_social: "aceptado",
+        },
+      });
+
+      res.json({ total });
+    } catch (error) {
+      console.error("Error total trabajos sociales activos:", error);
+      res.status(500).json({
+        message: "Error al obtener total de trabajos sociales activos",
+      });
+    }
+  }
+);
+
+
+router.get(
+  "/total-certificados-finales",
+  authMiddleware,
+  verificarRol("gestor-udh"),
+  async (req, res) => {
+    try {
+      const total = await TrabajoSocialSeleccionado.count({
+        where: {
+          certificado_final: {
+            [Op.ne]: null,
+          },
+          estado_informe_final: "aprobado",
+        },
+      });
+
+      res.json({ total });
+    } catch (error) {
+      console.error("Error total certificados finales:", error);
+      res
+        .status(500)
+        .json({ message: "Error al obtener total de certificados finales" });
     }
   }
 );

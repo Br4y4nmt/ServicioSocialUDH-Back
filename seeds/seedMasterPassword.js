@@ -13,10 +13,10 @@ const SystemConfig = require('../models/SystemConfig');
       master_password_hash: hash
     });
 
-    console.log("✅ Clave maestra insertada con éxito");
+    console.log("Clave maestra insertada con éxito");
     process.exit(0);
   } catch (err) {
-    console.error("❌ Error insertando clave maestra:", err);
+    console.error("Error insertando clave maestra:", err);
     process.exit(1);
   }
 })();
