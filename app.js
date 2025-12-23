@@ -53,7 +53,6 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
   }
 }));
 
-// Rutas
 const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
 

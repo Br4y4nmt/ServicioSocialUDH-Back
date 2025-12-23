@@ -18,7 +18,7 @@ const getDatosAcademicosUDH = async (codigo) => {
       programa: info.stu_programa
     };
   } catch (error) {
-    console.error(`❌ Error con código ${codigo}:`, error.message);
+    console.error(`Error con código ${codigo}:`, error.message);
     return null; 
   }
 };
