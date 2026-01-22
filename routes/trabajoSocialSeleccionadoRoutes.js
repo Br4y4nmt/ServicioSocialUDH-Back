@@ -6,7 +6,8 @@ const multer = require('multer');
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
-const TrabajoSocialSeleccionado = require('../models/TrabajoSocialSeleccionado');
+const sequelize = require('../config/database');
+const { TrabajoSocialSeleccionado, IntegranteGrupo } = require('../models');
 const ProgramasAcademicos = require('../models/ProgramasAcademicos');
 const CronogramaActividades = require('../models/CronogramaActividad');
 const LaboresSociales = require('../models/LaboresSociales');
@@ -259,27 +260,83 @@ router.post('/',
   authMiddleware,
   verificarRol('alumno'),
   async (req, res) => {
-    try {
-        const {
-            usuario_id,
-            programa_academico_id,
-            docente_id,
-            labor_social_id,
-            facultad_id,
-            tipo_servicio_social,
-            linea_accion_id 
-        } = req.body;
+    const t = await sequelize.transaction();
 
-        if (!usuario_id || isNaN(usuario_id)) {
-            return res.status(400).json({ message: 'usuario_id inválido' });
+    try {
+      const {
+        usuario_id,
+        programa_academico_id,
+        docente_id,
+        labor_social_id,
+        facultad_id,
+        tipo_servicio_social,
+        linea_accion_id,
+        correos // 👈 NUEVO: viene del frontend cuando es grupal
+      } = req.body;
+
+      // Validaciones base
+      if (!usuario_id || isNaN(usuario_id)) {
+        await t.rollback();
+        return res.status(400).json({ message: 'usuario_id inválido' });
+      }
+
+      if (!facultad_id || isNaN(facultad_id)) {
+        await t.rollback();
+        return res.status(400).json({ message: 'facultad_id inválido' });
+      }
+
+      if (!['individual', 'grupal'].includes(tipo_servicio_social)) {
+        await t.rollback();
+        return res.status(400).json({ message: 'tipo_servicio_social inválido' });
+      }
+
+      // ✅ Si es grupal, validar correos ANTES de crear el trabajo
+      let correosNorm = [];
+      if (tipo_servicio_social === 'grupal') {
+        if (!Array.isArray(correos)) {
+          await t.rollback();
+          return res.status(400).json({ message: 'Debes enviar un arreglo de correos' });
         }
-        if (!facultad_id || isNaN(facultad_id)) { 
-            return res.status(400).json({ message: 'facultad_id inválido' });
-        }   
-        if (!['individual', 'grupal'].includes(tipo_servicio_social)) {
-          return res.status(400).json({ message: 'tipo_servicio_social inválido' });
+
+        // Normalizar
+        correosNorm = correos
+          .map(c => String(c || '').trim().toLowerCase())
+          .filter(Boolean);
+
+        if (correosNorm.length === 0) {
+          await t.rollback();
+          return res.status(400).json({ message: 'No se enviaron correos válidos' });
         }
-       const nuevoRegistro = await TrabajoSocialSeleccionado.create({
+
+        // Dominio UDH
+        const invalidos = correosNorm.filter(c => !c.endsWith('@udh.edu.pe'));
+        if (invalidos.length) {
+          await t.rollback();
+          return res.status(400).json({
+            message: 'Hay correos con dominio inválido (solo @udh.edu.pe)',
+            invalidos
+          });
+        }
+
+        // Duplicados dentro del request
+        const seen = new Set();
+        const duplicadosReq = new Set();
+        for (const c of correosNorm) {
+          if (seen.has(c)) duplicadosReq.add(c);
+          else seen.add(c);
+        }
+
+        if (duplicadosReq.size > 0) {
+          await t.rollback();
+          return res.status(409).json({
+            message: 'Hay correos repetidos en el envío',
+            duplicados: [...duplicadosReq]
+          });
+        }
+      }
+
+      // ✅ 1) Crear trabajo social (aún NO se confirma)
+      const nuevoRegistro = await TrabajoSocialSeleccionado.create({
         usuario_id: parseInt(usuario_id),
         programa_academico_id: parseInt(programa_academico_id),
         docente_id: parseInt(docente_id),
@@ -287,14 +344,40 @@ router.post('/',
         facultad_id: parseInt(facultad_id),
         tipo_servicio_social,
         linea_accion_id: parseInt(linea_accion_id)
+      }, { transaction: t });
+
+      // ✅ 2) Si es grupal, guardar integrantes en la misma transacción
+      if (tipo_servicio_social === 'grupal') {
+        await IntegranteGrupo.bulkCreate(
+          correosNorm.map(correo => ({
+            trabajo_social_id: nuevoRegistro.id,
+            correo_institucional: correo
+          })),
+          { validate: true, transaction: t }
+        );
+      }
+
+      // ✅ 3) Confirmar todo
+      await t.commit();
+
+      return res.status(201).json({
+        message: 'Trabajo social creado correctamente',
+        id: nuevoRegistro.id
       });
 
-        res.status(201).json(nuevoRegistro);
     } catch (error) {
-        console.error('Error al guardar selección de labor social:', error);
-        res.status(500).json({ message: 'Error al guardar selección', error });
+      await t.rollback();
+      console.error('❌ Error al guardar selección con rollback:', error);
+
+      return res.status(500).json({
+        message: 'Error al guardar selección',
+        error: error.message
+      });
     }
-});
+  }
+);
+
+
 // Ruta para obtener el estado del trabajo social por usuario_id
 router.get('/usuario/:usuario_id',
   authMiddleware,

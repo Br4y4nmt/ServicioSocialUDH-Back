@@ -4,32 +4,86 @@ const { IntegranteGrupo, TrabajoSocialSeleccionado, Usuario} = require('../model
 const authMiddleware = require('../middlewares/authMiddleware');
 const verificarRol = require('../middlewares/verificarRol');
 const { getDatosAcademicosUDH } = require('../services/udhService');
+
+
 router.post('/',
   authMiddleware,
   verificarRol('alumno', 'gestor-udh'),
   async (req, res) => {
-  try {
-    const { trabajo_social_id, correos } = req.body;
+    try {
+      const { trabajo_social_id, correos } = req.body;
 
-    if (!trabajo_social_id || !Array.isArray(correos)) {
-      return res.status(400).json({ message: 'Faltan datos requeridos' });
-    }
+      if (!trabajo_social_id || !Array.isArray(correos)) {
+        return res.status(400).json({ message: 'Faltan datos requeridos' });
+      }
 
-    const registros = await Promise.all(
-      correos.map(correo => 
-        IntegranteGrupo.create({
+      // 1) Normalizar
+      const correosNorm = correos
+        .map(c => String(c || '').trim().toLowerCase())
+        .filter(Boolean);
+
+      if (correosNorm.length === 0) {
+        return res.status(400).json({ message: 'No se enviaron correos válidos' });
+      }
+
+      // (Opcional) validar dominio udh
+      const invalidos = correosNorm.filter(c => !c.endsWith('@udh.edu.pe'));
+      if (invalidos.length) {
+        return res.status(400).json({
+          message: 'Hay correos con dominio inválido (solo @udh.edu.pe)',
+          invalidos,
+        });
+      }
+
+      // 2) Duplicados dentro del mismo request
+      const seen = new Set();
+      const duplicadosReq = new Set();
+      for (const c of correosNorm) {
+        if (seen.has(c)) duplicadosReq.add(c);
+        else seen.add(c);
+      }
+      if (duplicadosReq.size > 0) {
+        return res.status(409).json({
+          message: 'Hay correos repetidos en el envío',
+          duplicados: [...duplicadosReq],
+        });
+      }
+
+      // 3) Duplicados contra la BD (mismo trabajo_social_id)
+      const existentes = await IntegranteGrupo.findAll({
+        where: {
           trabajo_social_id,
-          correo_institucional: correo.trim().toLowerCase()
-        })
-      )
-    );
+          correo_institucional: correosNorm,
+        },
+        attributes: ['correo_institucional'],
+      });
 
-    res.status(201).json({ message: 'Integrantes registrados', registros });
-  } catch (error) {
-    console.error('Error al registrar integrantes:', error);
-    res.status(500).json({ message: 'Error del servidor' });
+      if (existentes.length > 0) {
+        return res.status(409).json({
+          message: 'Algunos correos ya están registrados en este trabajo social',
+          duplicados: existentes.map(e => e.correo_institucional),
+        });
+      }
+
+      // 4) Insertar (bulkCreate es más eficiente que Promise.all create)
+      const registros = await IntegranteGrupo.bulkCreate(
+        correosNorm.map(correo => ({
+          trabajo_social_id,
+          correo_institucional: correo
+        })),
+        { validate: true }
+      );
+
+      return res.status(201).json({ message: 'Integrantes registrados', registros });
+
+    } catch (error) {
+      console.error('Error al registrar integrantes:', error);
+      return res.status(500).json({ message: 'Error del servidor' });
+    }
   }
-});
+);
+
+
 // Obtener los integrantes por ID del trabajo social
 router.get('/:trabajo_social_id',
   authMiddleware,
