@@ -60,7 +60,11 @@ Estudiantes.init({
     allowNull: true,
     defaultValue: null
   },
-
+  estado: {
+  type: DataTypes.ENUM('ATENDIDO', 'NO_ATENDIDO'),
+  allowNull: false,
+  defaultValue: 'NO_ATENDIDO',
+},
   id_usuario: {
     type: DataTypes.INTEGER,
     allowNull: false,
