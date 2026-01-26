@@ -165,6 +165,82 @@ router.get('/supervisores',
     }
   }
 );
+
+
+
+router.get(
+  '/estudiantes-finalizados',
+  authMiddleware,
+  verificarRol('gestor-udh', 'programa-academico', 'docente supervisor'),
+  async (req, res) => {
+    try {
+      const rows = await TrabajoSocialSeleccionado.findAll({
+        where: {
+          estado_informe_final: 'aprobado',
+          certificado_final: { [Op.ne]: null }
+        },
+        include: [
+          {
+            model: Estudiantes,
+            required: true, 
+            attributes: [
+              'id_estudiante',
+              'id_usuario',
+              'nombre_estudiante',
+              'dni',
+              'email',
+              'codigo',
+              'celular',
+              'sede',
+              'modalidad',
+              'estado' 
+            ],
+            include: [
+              { model: ProgramasAcademicos, as: 'programa', attributes: ['id_programa', 'nombre_programa'] },
+              { model: Facultades, as: 'facultad', attributes: ['id_facultad', 'nombre_facultad'] }
+            ]
+          }
+        ],
+        attributes: [
+          'id',
+          'usuario_id',
+          'estado_informe_final',
+          'certificado_final',
+          'informe_final_pdf',
+          'tipo_servicio_social',
+          'createdAt'
+        ],
+        order: [['createdAt', 'DESC']]
+      });
+
+      const data = rows.map(r => {
+        const p = r.get({ plain: true });
+        return {
+          estudiante: p.Estudiante, 
+          trabajo: {
+            id: p.id,
+            usuario_id: p.usuario_id,
+            estado_informe_final: p.estado_informe_final,
+            certificado_final: p.certificado_final,
+            informe_final_pdf: p.informe_final_pdf,
+            tipo_servicio_social: p.tipo_servicio_social,
+            createdAt: p.createdAt
+          }
+        };
+      });
+
+      return res.status(200).json({ total: data.length, data });
+    } catch (error) {
+      console.error('Error en /estudiantes-finalizados:', error);
+      return res.status(500).json({
+        message: 'Error al obtener estudiantes finalizados',
+        error: error.message
+      });
+    }
+  }
+);
+
+
 router.get('/informes-finales',
   authMiddleware,
   verificarRol('docente supervisor', 'gestor-udh', 'programa-academico'),

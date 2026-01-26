@@ -292,6 +292,7 @@ router.put('/actualizar-celular-perfil/:usuario_id',
     }
   });
 
+
 router.put('/actualizar-celular/:usuario_id',
   authMiddleware,
   verificarRol('alumno', 'gestor-udh', 'programa-academico'),
@@ -306,25 +307,19 @@ router.put('/actualizar-celular/:usuario_id',
         return res.status(404).json({ message: 'Estudiante no encontrado' });
       }
 
-      // ✅ Validación de sede
       if (sede && !['HUÁNUCO', 'LEONCIO PRADO'].includes(sede)) {
         return res.status(400).json({ message: 'Sede inválida' });
       }
 
-      // ✅ Validación de modalidad
       if (modalidad && !['PRESENCIAL', 'SEMI-PRESENCIAL'].includes(modalidad)) {
         return res.status(400).json({ message: 'Modalidad inválida' });
       }
-
-      // ✅ Campos a actualizar
       const camposActualizados = {};
       if (celular) camposActualizados.celular = celular;
       if (sede !== undefined) camposActualizados.sede = sede;
       if (modalidad !== undefined) camposActualizados.modalidad = modalidad.toUpperCase();
 
       await estudiante.update(camposActualizados);
-
-      // 🔁 Actualizar primera_vez en tabla usuarios
       const usuario = await Usuario.findByPk(usuario_id);
       if (usuario && usuario.primera_vez === true) {
         usuario.primera_vez = false;
@@ -339,6 +334,8 @@ router.put('/actualizar-celular/:usuario_id',
     }
   }
 );
+
+
 router.post('/grupo-nombres', async (req, res) => {
   const { correos } = req.body;
 
@@ -368,5 +365,45 @@ router.post('/grupo-nombres', async (req, res) => {
     res.status(500).json({ message: 'Error al obtener nombres del grupo', error });
   }
 });
+
+router.patch(
+  '/:id_estudiante/estado',
+  authMiddleware,
+  verificarRol('gestor-udh'), 
+  async (req, res) => {
+    try {
+      const { id_estudiante } = req.params;
+      const { estado } = req.body;
+
+      const estadosValidos = ['ATENDIDO', 'NO_ATENDIDO'];
+      if (!estadosValidos.includes(String(estado || '').toUpperCase())) {
+        return res.status(400).json({
+          message: 'Estado inválido. Use: ATENDIDO o NO_ATENDIDO'
+        });
+      }
+
+      const estudiante = await Estudiantes.findByPk(id_estudiante);
+      if (!estudiante) {
+        return res.status(404).json({ message: 'Estudiante no encontrado' });
+      }
+
+      await estudiante.update({ estado: String(estado).toUpperCase() });
+
+      return res.status(200).json({
+        message: 'Estado actualizado correctamente',
+        estudiante: {
+          id_estudiante: estudiante.id_estudiante,
+          estado: estudiante.estado
+        }
+      });
+    } catch (error) {
+      console.error('Error al cambiar estado del estudiante:', error);
+      return res.status(500).json({
+        message: 'Error interno al cambiar estado',
+        error: error.message
+      });
+    }
+  }
+);
 
 module.exports = router;
