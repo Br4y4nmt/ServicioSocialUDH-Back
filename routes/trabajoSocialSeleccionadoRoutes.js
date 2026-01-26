@@ -16,6 +16,7 @@ const Facultades = require('../models/Facultades');
 const ObservacionTrabajoSocial = require('../models/ObservacionTrabajoSocial');
 const LineaDeAccion = require('../models/LineaDeAccion'); 
 const Docentes = require('../models/Docentes');
+const { getDatosAcademicosUDH } = require('../services/udhservicenuevo');
 const { Op } = require('sequelize');
 
 const storageCertificadoFinal = multer.diskStorage({
@@ -182,7 +183,7 @@ router.get(
         include: [
           {
             model: Estudiantes,
-            required: true, 
+            required: true,
             attributes: [
               'id_estudiante',
               'id_usuario',
@@ -193,11 +194,19 @@ router.get(
               'celular',
               'sede',
               'modalidad',
-              'estado' 
+              'estado'
             ],
             include: [
-              { model: ProgramasAcademicos, as: 'programa', attributes: ['id_programa', 'nombre_programa'] },
-              { model: Facultades, as: 'facultad', attributes: ['id_facultad', 'nombre_facultad'] }
+              {
+                model: ProgramasAcademicos,
+                as: 'programa',
+                attributes: ['id_programa', 'nombre_programa']
+              },
+              {
+                model: Facultades,
+                as: 'facultad',
+                attributes: ['id_facultad', 'nombre_facultad']
+              }
             ]
           }
         ],
@@ -213,11 +222,39 @@ router.get(
         order: [['createdAt', 'DESC']]
       });
 
-      const data = rows.map(r => {
-        const p = r.get({ plain: true });
-        return {
-          estudiante: p.Estudiante, 
-          trabajo: {
+      let udhDown = false;
+      
+      try {
+        const primerGrupal = rows.find((r) => {
+          const p = r.get({ plain: true });
+          return (p.tipo_servicio_social || '').toString().trim().toLowerCase() === 'grupal';
+        });
+
+        if (primerGrupal) {
+          const pTest = primerGrupal.get({ plain: true });
+          const igTest = await IntegranteGrupo.findOne({
+            where: { trabajo_social_id: pTest.id },
+            attributes: ['correo_institucional']
+          });
+
+          if (igTest) {
+            const correoTest = (igTest.correo_institucional || '').trim();
+            const codigoTest = correoTest.includes('@') ? correoTest.split('@')[0] : correoTest;
+
+            const test = await getDatosAcademicosUDH(codigoTest);
+            if (!test) udhDown = true; // <- tu service devuelve null cuando falla
+          }
+        }
+      } catch (e) {
+        // Si el test falla por cualquier motivo, lo tratamos como "down"
+        udhDown = true;
+      }
+
+      const data = await Promise.all(
+        rows.map(async (r) => {
+          const p = r.get({ plain: true });
+
+          const trabajo = {
             id: p.id,
             usuario_id: p.usuario_id,
             estado_informe_final: p.estado_informe_final,
@@ -225,11 +262,128 @@ router.get(
             informe_final_pdf: p.informe_final_pdf,
             tipo_servicio_social: p.tipo_servicio_social,
             createdAt: p.createdAt
-          }
-        };
-      });
+          };
 
-      return res.status(200).json({ total: data.length, data });
+          // ✅ Si es grupal: traer integrantes + estado desde BD + (si UDH está OK) consultar UDH
+          if ((p.tipo_servicio_social || '').toString().trim().toLowerCase() === 'grupal') {
+            const integrantesDB = await IntegranteGrupo.findAll({
+              where: { trabajo_social_id: p.id },
+              attributes: [
+                'id_integrante',
+                'trabajo_social_id',
+                'correo_institucional',
+                'estado',
+                'createdAt',
+                'updatedAt'
+              ]
+            });
+
+            const integrantes = await Promise.all(
+              integrantesDB.map(async (ig) => {
+                const plain = ig.get({ plain: true });
+                const correo = (plain.correo_institucional || '').trim();
+                const codigo = correo.includes('@') ? correo.split('@')[0] : correo;
+
+                // ✅ Si UDH está caída, NO llamamos la API externa (evita timeouts por integrante)
+                if (udhDown) {
+                  return {
+                    id_estudiante: null,
+                    id_usuario: null,
+                    nombre_estudiante: null,
+                    dni: null,
+                    email: correo || null,
+                    codigo: codigo || null,
+                    celular: null,
+                    sede: null,
+                    modalidad: null,
+                    estado: plain.estado || 'NO_ATENDIDO',
+                    programa: null,
+                    facultad: null,
+                    __integrante_grupo: {
+                      id_integrante: plain.id_integrante,
+                      trabajo_social_id: plain.trabajo_social_id,
+                      correo_institucional: correo,
+                      estado: plain.estado || 'NO_ATENDIDO',
+                      error_udh: 'UDH_DOWN'
+                    }
+                  };
+                }
+
+                // ✅ UDH OK: consultamos la API externa
+                const udh = await getDatosAcademicosUDH(codigo);
+
+                // Si tu service devolvió null, igualmente devolvemos el integrante
+                if (!udh) {
+                  return {
+                    id_estudiante: null,
+                    id_usuario: null,
+                    nombre_estudiante: null,
+                    dni: null,
+                    email: correo || null,
+                    codigo: codigo || null,
+                    celular: null,
+                    sede: null,
+                    modalidad: null,
+                    estado: plain.estado || 'NO_ATENDIDO',
+                    programa: null,
+                    facultad: null,
+                    __integrante_grupo: {
+                      id_integrante: plain.id_integrante,
+                      trabajo_social_id: plain.trabajo_social_id,
+                      correo_institucional: correo,
+                      estado: plain.estado || 'NO_ATENDIDO',
+                      error_udh: 'UDH_NULL'
+                    }
+                  };
+                }
+
+                // ✅ Tu service ya devuelve:
+                // { nombre_completo, dni, codigo, facultad, programa, ciclo }
+                return {
+                  id_estudiante: null,
+                  id_usuario: null,
+                  nombre_estudiante: udh.nombre_completo || null,
+                  dni: udh.dni || null,
+                  email: correo || null,
+                  codigo: udh.codigo || codigo || null,
+                  celular: udh.celular || null,
+                  sede: udh.sede || null,
+                  modalidad: udh.modalidad || null,
+                  estado: plain.estado || 'NO_ATENDIDO',
+                  programa: udh.programa
+                    ? { id_programa: null, nombre_programa: udh.programa }
+                    : null,
+                  facultad: udh.facultad
+                    ? { id_facultad: null, nombre_facultad: udh.facultad }
+                    : null,
+                  ciclo: udh.ciclo ?? null,
+                  __integrante_grupo: {
+                    id_integrante: plain.id_integrante,
+                    trabajo_social_id: plain.trabajo_social_id,
+                    correo_institucional: correo,
+                    estado: plain.estado || 'NO_ATENDIDO'
+                  }
+                };
+              })
+            );
+
+            trabajo.integrantes_grupo = integrantes;
+          }
+
+          return {
+            estudiante: p.Estudiante,
+            trabajo
+          };
+        })
+      );
+
+      return res.status(200).json({
+        total: data.length,
+        data,
+        meta: {
+          udhDown
+        }
+      });
     } catch (error) {
       console.error('Error en /estudiantes-finalizados:', error);
       return res.status(500).json({

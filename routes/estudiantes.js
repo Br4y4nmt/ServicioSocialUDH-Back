@@ -6,11 +6,14 @@ const Usuario = require('../models/Usuario');
 const Facultades = require('../models/Facultades');
 const authMiddleware = require('../middlewares/authMiddleware');
 const verificarRol = require('../middlewares/verificarRol');
-const axios = require('axios'); // Asegúrate de que esta línea esté presente
+const IntegranteGrupo = require('../models/IntegranteGrupo');
+const axios = require('axios'); 
+
+
 
 router.get('/perfil-estudiante/:correo', async (req, res) => {
   const { correo } = req.params;
-  const codigoDesdeCorreo = correo.split('@')[0]; // Extraemos el código del correo
+  const codigoDesdeCorreo = correo.split('@')[0];
 
   try {
     const response = await axios.get(`http://www.udh.edu.pe/websauh/secretaria_general/gradosytitulos/datos_estudiante_json.aspx?_c_3456=${codigoDesdeCorreo}`);
@@ -29,6 +32,8 @@ router.get('/perfil-estudiante/:correo', async (req, res) => {
     res.status(500).json({ message: 'Error al obtener los datos del estudiante' });
   }
 });
+
+
 router.get('/usuario/:id_usuario',
   authMiddleware,
   verificarRol('alumno'),
@@ -372,32 +377,55 @@ router.patch(
   verificarRol('gestor-udh'), 
   async (req, res) => {
     try {
-      const { id_estudiante } = req.params;
-      const { estado } = req.body;
+      const { id_estudiante, id_integrante, estado } = req.body;
 
       const estadosValidos = ['ATENDIDO', 'NO_ATENDIDO'];
-      if (!estadosValidos.includes(String(estado || '').toUpperCase())) {
-        return res.status(400).json({
-          message: 'Estado inválido. Use: ATENDIDO o NO_ATENDIDO'
+      const estadoFinal = String(estado || '').toUpperCase().trim();
+
+      if (!estadosValidos.includes(estadoFinal)) {
+        return res.status(400).json({ message: 'Estado inválido. Use: ATENDIDO o NO_ATENDIDO' });
+      }
+
+      // 1) Si viene integrante -> actualiza IntegranteGrupo
+      if (id_integrante) {
+        const integrante = await IntegranteGrupo.findByPk(id_integrante);
+        if (!integrante) return res.status(404).json({ message: 'Integrante no encontrado' });
+
+        await integrante.update({ estado: estadoFinal });
+
+        return res.status(200).json({
+          message: 'Estado del integrante actualizado correctamente',
+          integrante: {
+            id_integrante: integrante.id_integrante,
+            trabajo_social_id: integrante.trabajo_social_id,
+            correo_institucional: integrante.correo_institucional,
+            estado: integrante.estado
+          }
         });
       }
 
-      const estudiante = await Estudiantes.findByPk(id_estudiante);
-      if (!estudiante) {
-        return res.status(404).json({ message: 'Estudiante no encontrado' });
+      // 2) Si viene estudiante -> actualiza Estudiantes
+      if (id_estudiante) {
+        const estudiante = await Estudiantes.findByPk(id_estudiante);
+        if (!estudiante) return res.status(404).json({ message: 'Estudiante no encontrado' });
+
+        await estudiante.update({ estado: estadoFinal });
+
+        return res.status(200).json({
+          message: 'Estado del estudiante actualizado correctamente',
+          estudiante: {
+            id_estudiante: estudiante.id_estudiante,
+            estado: estudiante.estado
+          }
+        });
       }
 
-      await estudiante.update({ estado: String(estado).toUpperCase() });
-
-      return res.status(200).json({
-        message: 'Estado actualizado correctamente',
-        estudiante: {
-          id_estudiante: estudiante.id_estudiante,
-          estado: estudiante.estado
-        }
+      return res.status(400).json({
+        message: 'Debe enviar id_estudiante o id_integrante'
       });
+
     } catch (error) {
-      console.error('Error al cambiar estado del estudiante:', error);
+      console.error('Error al cambiar estado:', error);
       return res.status(500).json({
         message: 'Error interno al cambiar estado',
         error: error.message
