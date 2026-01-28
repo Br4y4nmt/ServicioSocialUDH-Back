@@ -117,7 +117,7 @@ app.use('/api/trabajo-social', trabajoSocialSeleccionadoRoutes);
 
 const syncDatabase = async () => {
   try {
-    
+
     await Roles.sync();
     await TrabajoSocialSeleccionado.sync();
     await Usuario.sync();

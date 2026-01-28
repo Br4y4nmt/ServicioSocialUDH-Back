@@ -898,6 +898,43 @@ router.post('/guardar-pdf-html',
 });
 
 
+// 🔍 Ver / verificar certificado final del estudiante principal (QR)
+router.get('/certificado-final/:trabajo_id', async (req, res) => {
+  try {
+    const { trabajo_id } = req.params;
+
+    const trabajo = await TrabajoSocialSeleccionado.findByPk(trabajo_id, {
+      attributes: ['certificado_final']
+    });
+
+    if (!trabajo || !trabajo.certificado_final) {
+      return res.status(404).json({ message: 'Certificado final no encontrado' });
+    }
+
+    const rutaPDF = path.join(
+      __dirname,
+      '../uploads/certificados_finales',
+      trabajo.certificado_final
+    );
+
+    if (!fs.existsSync(rutaPDF)) {
+      return res.status(404).json({ message: 'Archivo PDF no existe en el servidor' });
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      'inline; filename="certificado_final.pdf"'
+    );
+
+    return res.sendFile(rutaPDF);
+
+  } catch (error) {
+    console.error('Error al servir certificado final:', error);
+    return res.status(500).json({ message: 'Error interno al servir certificado final' });
+  }
+});
+
 
 router.get('/:id',
   authMiddleware,

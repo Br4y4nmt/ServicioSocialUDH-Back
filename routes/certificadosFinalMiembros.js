@@ -68,4 +68,37 @@ router.get('/grupo/:trabajo_id',
   }
 );
 
+router.get('/:trabajo_id/:codigo',
+  async (req, res) => {
+    try {
+      const { trabajo_id, codigo } = req.params;
+
+      const cert = await CertificadoFinalMiembro.findOne({
+        where: { trabajo_id, codigo_universitario: codigo },
+        attributes: ['nombre_archivo_pdf']
+      });
+
+      if (!cert) {
+        return res.status(404).json({ message: 'Certificado del miembro no encontrado' });
+      }
+
+      const rutaPDF = path.join(__dirname, '../uploads/certificados_finales_miembros', cert.nombre_archivo_pdf);
+
+      if (!fs.existsSync(rutaPDF)) {
+        return res.status(404).json({ message: 'Archivo PDF no existe en el servidor' });
+      }
+
+      res.setHeader('Content-Disposition', `inline; filename="certificado_final_miembro.pdf"`);
+      res.setHeader('Content-Type', 'application/pdf');
+      return res.sendFile(rutaPDF);
+
+    } catch (error) {
+      console.error('Error al servir certificado final del miembro:', error);
+      return res.status(500).json({ message: 'Error interno al servir certificado final del miembro' });
+    }
+  }
+);
+
+
+
 module.exports = router;
