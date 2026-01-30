@@ -1268,35 +1268,45 @@ router.get('/documentos-trabajo/:id', async (req, res) => {
 
 
 
-router.get('/documento-termino/:id', async (req, res) => {
+router.get("/documento-termino/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const esMiembro = id.includes('_');
+    const { codigo } = req.query;
+
     let rutaPDF;
 
-    if (esMiembro) {
-      const nombreArchivo = `carta_Termino_${id}.pdf`;
-      rutaPDF = path.join(__dirname, '../uploads/cartas_termino', nombreArchivo);
-    } else {
-      const trabajo = await TrabajoSocialSeleccionado.findByPk(id);
-      if (!trabajo || !trabajo.carta_termino_pdf) {
-        return res.status(404).json({ message: 'Archivo no encontrado para este trabajo social' });
+    // ✅ SI VIENE CODIGO = MIEMBRO
+    if (codigo) {
+      const registro = await CartasTermino.findOne({
+        where: { trabajo_id: id, codigo_universitario: codigo },
+      });
+
+      if (!registro?.nombre_archivo_pdf) {
+        return res.status(404).json({ message: "Carta del integrante no encontrada" });
       }
 
-      rutaPDF = path.join(__dirname, '../uploads/cartas_termino', trabajo.carta_termino_pdf);
+      rutaPDF = path.join(__dirname, "../uploads/cartas_termino", registro.nombre_archivo_pdf);
+    } else {
+      // ✅ PRINCIPAL
+      const trabajo = await TrabajoSocialSeleccionado.findByPk(id);
+
+      if (!trabajo?.carta_termino_pdf) {
+        return res.status(404).json({ message: "Carta principal no encontrada" });
+      }
+
+      rutaPDF = path.join(__dirname, "../uploads/cartas_termino", trabajo.carta_termino_pdf);
     }
 
     if (!fs.existsSync(rutaPDF)) {
-      return res.status(404).json({ message: 'Archivo PDF no existe en el servidor' });
+      return res.status(404).json({ message: "Archivo PDF no existe en el servidor" });
     }
 
-    res.setHeader('Content-Disposition', `inline; filename="Carta_Termino.pdf"`);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.sendFile(rutaPDF);
-
+    res.setHeader("Content-Disposition", `inline; filename="Carta_Termino.pdf"`);
+    res.setHeader("Content-Type", "application/pdf");
+    return res.sendFile(rutaPDF);
   } catch (error) {
-    console.error('Error al servir carta de término:', error);
-    res.status(500).json({ message: 'Error interno al servir PDF de término', error });
+    console.error("Error al servir carta de término:", error);
+    return res.status(500).json({ message: "Error interno al servir PDF de término" });
   }
 });
 
