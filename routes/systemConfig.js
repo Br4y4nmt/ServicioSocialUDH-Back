@@ -4,7 +4,8 @@ const jwt = require('jsonwebtoken');
 const Usuario = require('../models/Usuario');
 const SystemConfig = require('../models/SystemConfig');
 const Roles = require('../models/Roles');
-
+const authMiddleware = require('../middlewares/authMiddleware');
+const verificarRol = require('../middlewares/verificarRol');
 const router = express.Router();
 
 // Impersonación con clave maestra
@@ -16,20 +17,16 @@ router.post('/impersonate-master', async (req, res) => {
       return res.status(400).json({ message: 'Correo y clave maestra son requeridos' });
     }
 
-    // 1. Buscar la clave maestra guardada
     const config = await SystemConfig.findOne();
     if (!config) {
       return res.status(500).json({ message: 'Clave maestra no configurada' });
     }
 
-    // 2. Comparar la clave ingresada con el hash
     const match = await bcrypt.compare(masterPassword, config.master_password_hash);
     if (!match) {
-      // ⚠️ Usamos 403 en lugar de 401
       return res.status(403).json({ message: 'Clave maestra incorrecta' });
     }
 
-    // 3. Buscar usuario por email con su rol
     const usuario = await Usuario.findOne({
       where: { email },
       include: [{ model: Roles }]
@@ -39,7 +36,6 @@ router.post('/impersonate-master', async (req, res) => {
       return res.status(404).json({ message: 'Usuario no encontrado' });
     }
 
-    // 4. Generar token JWT de impersonación
     const token = jwt.sign(
       {
         id: usuario.id_usuario,
@@ -51,7 +47,6 @@ router.post('/impersonate-master', async (req, res) => {
       { expiresIn: '2h' }
     );
 
-    // 5. Responder con el token y datos del usuario impersonado
     res.json({
       message: 'Impersonación exitosa',
       token,
@@ -69,5 +64,57 @@ router.post('/impersonate-master', async (req, res) => {
     res.status(500).json({ message: 'Error interno en impersonación' });
   }
 });
+// ✅ Obtener estado actual del registro (para mostrar en el panel)
+router.get('/registro',
+  authMiddleware,
+  verificarRol('gestor-udh'),
+  async (req, res) => {
+    try {
+      const config = await SystemConfig.findByPk(1);
+
+      if (!config) {
+        return res.status(404).json({ message: 'Configuración no encontrada' });
+      }
+
+      return res.status(200).json({
+        registro_habilitado: Number(config.registro_habilitado) === 1
+      });
+    } catch (error) {
+      console.error('Error obteniendo config:', error);
+      return res.status(500).json({ message: 'Error obteniendo configuración' });
+    }
+  }
+);
+
+// ✅ Cambiar estado del registro (true/false o 1/0)
+router.put('/registro',
+  authMiddleware,
+  verificarRol('gestor-udh'),
+  async (req, res) => {
+    try {
+      const { registro_habilitado } = req.body;
+
+      // Acepta: true/false, 1/0, "1"/"0"
+      const nuevoValor = Number(registro_habilitado) === 1 || registro_habilitado === true ? 1 : 0;
+
+      const config = await SystemConfig.findByPk(1);
+      if (!config) {
+        return res.status(404).json({ message: 'Configuración no encontrada' });
+      }
+
+      config.registro_habilitado = nuevoValor;
+      config.updated_at = new Date();
+      await config.save();
+
+      return res.status(200).json({
+        message: 'Configuración actualizada',
+        registro_habilitado: Number(config.registro_habilitado) === 1
+      });
+    } catch (error) {
+      console.error('Error actualizando config:', error);
+      return res.status(500).json({ message: 'Error actualizando configuración' });
+    }
+  }
+);
 
 module.exports = router;

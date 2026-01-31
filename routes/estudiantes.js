@@ -242,6 +242,7 @@ router.get('/programa/:programa_id',
     res.status(500).json({ message: 'Error al obtener estudiantes del programa', error });
   }
 });
+
 // Obtener estudiante completo por id_usuario
 router.get('/datos/usuario/:usuario_id',
   authMiddleware,
@@ -253,12 +254,12 @@ router.get('/datos/usuario/:usuario_id',
         include: [
           {
             model: ProgramasAcademicos,
-            as: 'programa', // ← alias correcto
+            as: 'programa', 
             attributes: ['nombre_programa']
           },
           {
             model: Facultades,
-            as: 'facultad', // ← alias correcto
+            as: 'facultad',
             attributes: ['nombre_facultad']
           }
         ]
@@ -274,6 +275,8 @@ router.get('/datos/usuario/:usuario_id',
       res.status(500).json({ message: 'Error al obtener datos del estudiante', error });
     }
 });
+
+
 router.put('/actualizar-celular-perfil/:usuario_id',
   authMiddleware,
   verificarRol('alumno', 'gestor-udh', 'programa-academico'),

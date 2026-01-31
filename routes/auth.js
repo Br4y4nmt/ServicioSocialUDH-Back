@@ -4,11 +4,12 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const jwt = require('jsonwebtoken');
 const sequelize = require('../config/database').sequelize;
-const { ProgramasAcademicos, Estudiantes, Facultades, Usuario, Docentes, Roles } = require('../models');
+const { ProgramasAcademicos, Estudiantes, Facultades, Usuario, Docentes, Roles} = require('../models');
 const { Op } = require('sequelize'); 
 const { OAuth2Client } = require('google-auth-library');
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const router = express.Router();
+const SystemConfig = require('../models/SystemConfig');
 const authMiddleware = require('../middlewares/authMiddleware'); 
 const verificarRol = require('../middlewares/verificarRol');  
 const axios = require('axios');
@@ -20,13 +21,21 @@ router.post('/register', async (req, res) => {
     if (!codigo || !dni || !whatsapp) {
       return res.status(400).json({ message: 'Faltan datos requeridos' });
     }
+    const config = await SystemConfig.findByPk(1);
+
+    if (!config || Number(config.registro_habilitado) === 0) {
+      console.log('REGISTRO BLOQUEADO POR CONFIG');
+      return res.status(403).json({
+        message: 'El registro de estudiantes está deshabilitado temporalmente'
+      });
+    }
 
     let data;
     try {
       const resUDH = await axios.get(`http://www.udh.edu.pe/websauh/secretaria_general/gradosytitulos/datos_estudiante_json.aspx?_c_3456=${codigo}`, { timeout: 7000 });
       data = resUDH.data[0];
     } catch (error) {
-      console.error('❌ Error conectando con la API de UDH:', error.message);
+      console.error('Error conectando con la API de UDH:', error.message);
       return res.status(503).json({ message: 'El servidor de UDH no está disponible. Intenta más tarde.' });
     }
 
@@ -37,52 +46,46 @@ router.post('/register', async (req, res) => {
     if (dni !== data.stu_dni) {
     return res.status(400).json({ message: 'El DNI ingresado no coincide con el DNI del estudiante' });
   }
-    // 2. Verificar si el estudiante está en el ciclo 7 o superior
     if (data.stu_ciclo < 7) {
       return res.status(400).json({ message: 'Solo pueden registrarse estudiantes del ciclo 7 o superior' });
     }
 
-    // 3. Verificar si el correo ya está registrado
     const existingUser = await Usuario.findOne({ where: { email: `${codigo}@udh.edu.pe` } });
     if (existingUser) {
       return res.status(409).json({ message: 'El correo ya está registrado' });
     }
 
-    // 4. Obtener el ID de la facultad por nombre
     const facultad = await Facultades.findOne({
-      where: { nombre_facultad: data.stu_facultad.trim() } // Comparando el nombre de la facultad
+      where: { nombre_facultad: data.stu_facultad.trim() } 
     });
 
     if (!facultad) {
       return res.status(400).json({ message: 'Facultad no encontrada' });
     }
 
-    // 5. Obtener el ID del programa académico por nombre
     const programa = await ProgramasAcademicos.findOne({
-      where: { nombre_programa: data.stu_programa.trim(), id_facultad: facultad.id_facultad } // Comparando el nombre del programa y facultad
+      where: { nombre_programa: data.stu_programa.trim(), id_facultad: facultad.id_facultad } 
     });
 
     if (!programa) {
       return res.status(400).json({ message: 'Programa académico no encontrado' });
     }
 
-    // 6. Crear el usuario en la tabla Usuario
     const nuevoUsuario = await Usuario.create({
       email: `${codigo}@udh.edu.pe`,
       dni,
       whatsapp,
-      password: '', // Vacío si no se usa
-      rol_id: 3 // Asignando rol por defecto (ajustar según sea necesario)
+      password: '', 
+      rol_id: 3 
     });
 
-    // 7. Crear el registro en la tabla Estudiantes
     await Estudiantes.create({
       nombre_estudiante: `${data.stu_nombres} ${data.stu_apellido_paterno} ${data.stu_apellido_materno}`,
       dni,
       email: `${codigo}@udh.edu.pe`,
       celular: whatsapp,
-      facultad_id: facultad.id_facultad,  // Asignando el ID de la facultad
-      programa_academico_id: programa.id_programa,  // Asignando el ID del programa académico
+      facultad_id: facultad.id_facultad,  
+      programa_academico_id: programa.id_programa,  
       id_usuario: nuevoUsuario.id_usuario,
       codigo: data.stu_codigo
     });
