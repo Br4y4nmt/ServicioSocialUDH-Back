@@ -10,6 +10,7 @@ const ProgramasAcademicos = require('../models/ProgramasAcademicos');
 const Usuario = require('../models/Usuario');
 const authMiddleware = require('../middlewares/authMiddleware');
 const verificarRol = require('../middlewares/verificarRol');
+const TrabajoSocialSeleccionado = require("../models/trabajoSocialSeleccionado");
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -69,6 +70,8 @@ router.get('/perfil', authMiddleware, async (req, res) => {
     res.status(500).json({ message: 'Error interno', error: error.message });
   }
 });
+
+
 router.put(
   '/',
   authMiddleware,
@@ -308,15 +311,31 @@ router.put('/:id_docente',
 
 
 
-router.delete('/:id_docente',
+router.delete(
+  "/:id_docente",
   authMiddleware,
-  verificarRol('gestor-udh', 'programa-academico'),
+  verificarRol("gestor-udh", "programa-academico"),
   async (req, res) => {
     try {
-      const docente = await Docentes.findByPk(req.params.id_docente);
+      const { id_docente } = req.params;
 
+      const docente = await Docentes.findByPk(id_docente);
       if (!docente) {
-        return res.status(404).json({ message: 'Docente no encontrado' });
+        return res.status(404).json({ message: "Docente no encontrado" });
+      }
+
+      const proyectoPendiente = await TrabajoSocialSeleccionado.findOne({
+        where: {
+          docente_id: id_docente,
+          certificado_final: null, 
+        },
+      });
+
+      if (proyectoPendiente) {
+        return res.status(409).json({
+          message:
+            "No se puede eliminar este docente porque tiene proyectos asignados sin certificado final.",
+        });
       }
 
       const usuarioId = docente.id_usuario;
@@ -325,16 +344,17 @@ router.delete('/:id_docente',
 
       if (usuarioId) {
         const usuario = await Usuario.findByPk(usuarioId);
-        if (usuario) {
-          await usuario.destroy();
-        }
+        if (usuario) await usuario.destroy();
       }
 
-      res.status(200).json({ message: 'Docente y usuario eliminados exitosamente.' });
-
+      return res
+        .status(200)
+        .json({ message: "Docente y usuario eliminados exitosamente." });
     } catch (error) {
-      console.error('Error al eliminar docente:', error);
-      res.status(500).json({ message: 'Error al eliminar docente y usuario.', error });
+      console.error("Error al eliminar docente:", error);
+      return res
+        .status(500)
+        .json({ message: "Error al eliminar docente y usuario.", error });
     }
   }
 );

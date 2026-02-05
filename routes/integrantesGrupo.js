@@ -17,7 +17,6 @@ router.post('/',
         return res.status(400).json({ message: 'Faltan datos requeridos' });
       }
 
-      // 1) Normalizar
       const correosNorm = correos
         .map(c => String(c || '').trim().toLowerCase())
         .filter(Boolean);
@@ -26,7 +25,6 @@ router.post('/',
         return res.status(400).json({ message: 'No se enviaron correos válidos' });
       }
 
-      // (Opcional) validar dominio udh
       const invalidos = correosNorm.filter(c => !c.endsWith('@udh.edu.pe'));
       if (invalidos.length) {
         return res.status(400).json({
@@ -35,7 +33,6 @@ router.post('/',
         });
       }
 
-      // 2) Duplicados dentro del mismo request
       const seen = new Set();
       const duplicadosReq = new Set();
       for (const c of correosNorm) {
@@ -49,7 +46,6 @@ router.post('/',
         });
       }
 
-      // 3) Duplicados contra la BD (mismo trabajo_social_id)
       const existentes = await IntegranteGrupo.findAll({
         where: {
           trabajo_social_id,
@@ -65,7 +61,6 @@ router.post('/',
         });
       }
 
-      // 4) Insertar (bulkCreate es más eficiente que Promise.all create)
       const registros = await IntegranteGrupo.bulkCreate(
         correosNorm.map(correo => ({
           trabajo_social_id,
@@ -98,7 +93,7 @@ router.get('/:trabajo_social_id',
 
     const integrantes = await IntegranteGrupo.findAll({
       where: { trabajo_social_id },
-      attributes: ['correo_institucional'], // solo devolver el correo
+      attributes: ['correo_institucional'], 
     });
 
     res.status(200).json(integrantes);
@@ -107,38 +102,51 @@ router.get('/:trabajo_social_id',
     res.status(500).json({ message: 'Error del servidor' });
   }
 });
-router.get('/estudiante/actual',
+
+
+router.get(
+  '/estudiante/actual',
   authMiddleware,
   verificarRol('alumno', 'docente supervisor', 'gestor-udh', 'programa-academico'),
   async (req, res) => {
-  try {
-    const usuario_id = req.query.usuario_id;
+    try {
+      const { usuario_id } = req.query;
 
-    if (!usuario_id) {
-      return res.status(400).json({ message: 'Falta el ID del usuario' });
+      if (!usuario_id) {
+        return res.status(400).json({ message: 'Falta el ID del usuario' });
+      }
+
+      const trabajo = await TrabajoSocialSeleccionado.findOne({
+        where: { usuario_id },
+      });
+
+      if (!trabajo) {
+        return res.status(200).json({
+          integrantes: [],
+          message: 'Aún no tienes una solicitud registrada.',
+        });
+      }
+
+      const integrantes = await IntegranteGrupo.findAll({
+        where: { trabajo_social_id: trabajo.id },
+        attributes: ['correo_institucional'],
+      });
+
+      return res.status(200).json({
+        integrantes,
+        message:
+          integrantes.length === 0
+            ? 'Aún no tienes integrantes registrados.'
+            : null,
+      });
+    } catch (error) {
+      console.error('Error al obtener integrantes del estudiante:', error);
+      return res.status(500).json({ message: 'Error del servidor' });
     }
-
-    // Buscar el trabajo social actual del estudiante
-    const trabajo = await TrabajoSocialSeleccionado.findOne({
-      where: { usuario_id },
-    });
-
-    if (!trabajo) {
-      return res.status(404).json({ message: 'Trabajo social no encontrado para este estudiante' });
-    }
-
-    // Buscar los integrantes del grupo usando ese ID
-    const integrantes = await IntegranteGrupo.findAll({
-      where: { trabajo_social_id: trabajo.id },
-      attributes: ['correo_institucional'],
-    });
-
-    res.status(200).json(integrantes);
-  } catch (error) {
-    console.error('Error al obtener integrantes del estudiante:', error);
-    res.status(500).json({ message: 'Error del servidor' });
   }
-});
+);
+
+
 
 
 router.get('/:trabajo_social_id/enriquecido',
@@ -148,7 +156,6 @@ router.get('/:trabajo_social_id/enriquecido',
     try {
       const { trabajo_social_id } = req.params;
 
-      // 1. Buscar el trabajo social
       const trabajo = await TrabajoSocialSeleccionado.findOne({
         where: { id: trabajo_social_id }
       });
@@ -157,7 +164,6 @@ router.get('/:trabajo_social_id/enriquecido',
         return res.status(404).json({ message: 'Trabajo social no encontrado' });
       }
 
-      // 2. Si es individual, buscar correo del usuario
       if (trabajo.tipo_servicio_social === 'individual') {
         const usuario = await Usuario.findOne({
           where: { id: trabajo.usuario_id }
@@ -178,7 +184,6 @@ router.get('/:trabajo_social_id/enriquecido',
         }]);
       }
 
-      // 3. Si es grupal, obtener los correos de integrantes
       const integrantes = await IntegranteGrupo.findAll({
         where: { trabajo_social_id },
         attributes: ['correo_institucional']
@@ -204,7 +209,7 @@ router.get('/:trabajo_social_id/enriquecido',
 
       res.json(resultados.filter(r => r !== null));
     } catch (error) {
-      console.error('❌ Error en enriquecido:', error);
+      console.error('Error en enriquecido:', error);
       res.status(500).json({ message: 'Error del servidor' });
     }
   }
