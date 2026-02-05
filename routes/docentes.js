@@ -10,7 +10,7 @@ const ProgramasAcademicos = require('../models/ProgramasAcademicos');
 const Usuario = require('../models/Usuario');
 const authMiddleware = require('../middlewares/authMiddleware');
 const verificarRol = require('../middlewares/verificarRol');
-const TrabajoSocialSeleccionado = require("../models/trabajoSocialSeleccionado");
+const TrabajoSocialSeleccionado = require("../models/TrabajoSocialSeleccionado");
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
