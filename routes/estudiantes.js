@@ -7,31 +7,7 @@ const Facultades = require('../models/Facultades');
 const authMiddleware = require('../middlewares/authMiddleware');
 const verificarRol = require('../middlewares/verificarRol');
 const IntegranteGrupo = require('../models/IntegranteGrupo');
-const axios = require('axios'); 
-
-
-
-router.get('/perfil-estudiante/:correo', async (req, res) => {
-  const { correo } = req.params;
-  const codigoDesdeCorreo = correo.split('@')[0];
-
-  try {
-    const response = await axios.get(`http://www.udh.edu.pe/websauh/secretaria_general/gradosytitulos/datos_estudiante_json.aspx?_c_3456=${codigoDesdeCorreo}`);
-    const data = response.data[0];
-    const nombre_completo = `${data.stu_nombres || ''} ${data.stu_apellido_paterno || ''} ${data.stu_apellido_materno || ''}`.trim();
-    res.json({
-      nombre_completo,
-      dni: data.stu_dni || '',
-      codigo: data.stu_codigo || '',
-      facultad: data.stu_facultad || '',
-      programa: data.stu_programa || '',
-      correo,
-    });
-  } catch (error) {
-    console.error('Error al obtener los datos del estudiante:', error);
-    res.status(500).json({ message: 'Error al obtener los datos del estudiante' });
-  }
-});
+const { getDatosAcademicosUDH } = require('../services/udhservicenuevo');
 
 
 router.get('/usuario/:id_usuario',
@@ -114,12 +90,12 @@ router.get('/',
         include: [
           {
             model: ProgramasAcademicos,
-            as: 'programa', // 👈 alias correcto
+            as: 'programa',
             attributes: ['nombre_programa']
           },
           {
             model: Facultades,
-            as: 'facultad', // 👈 alias correcto
+            as: 'facultad', 
             attributes: ['nombre_facultad']
           }
         ]
@@ -132,6 +108,8 @@ router.get('/',
       res.status(500).json({ message: 'Error al obtener estudiantes', error });
     }
   });
+
+
 
 // Obtener estudiante por ID
 router.get('/:id_estudiante',
@@ -157,44 +135,6 @@ router.get('/:id_estudiante',
   }
 });
 
-// Actualizar estudiante
-router.put('/:id_estudiante',
-  authMiddleware,
-  verificarRol('gestor-udh', 'programa-academico'),
-  async (req, res) => {
-  try {
-    const estudiante = await Estudiantes.findByPk(req.params.id_estudiante);
-    if (estudiante) {
-      const { nombre_estudiante, programa_academico_id } = req.body;
-      await estudiante.update({ nombre_estudiante, programa_academico_id });
-      res.status(200).json(estudiante);
-    } else {
-      res.status(404).json({ message: 'Estudiante no encontrado' });
-    }
-  } catch (error) {
-    console.error('Error al actualizar estudiante:', error);
-    res.status(500).json({ message: 'Error al actualizar estudiante', error });
-  }
-});
-
-// Eliminar estudiante
-router.delete('/:id_estudiante',
-  authMiddleware,
-  verificarRol('gestor-udh', 'programa-academico'),
-  async (req, res) => {
-  try {
-    const estudiante = await Estudiantes.findByPk(req.params.id_estudiante);
-    if (!estudiante) {
-      return res.status(404).json({ message: 'Estudiante no encontrado' });
-    }
-
-    await estudiante.destroy();
-    res.status(200).json({ message: 'Estudiante eliminado exitosamente.' });
-  } catch (error) {
-    console.error('Error al eliminar estudiante:', error);
-    res.status(500).json({ message: 'Error al eliminar estudiante', error });
-  }
-});
 
 // Obtener id_estudiante desde id_usuario
 router.get('/usuario/:usuario_id',
@@ -217,6 +157,7 @@ router.get('/usuario/:usuario_id',
     res.status(500).json({ message: 'Error al obtener estudiante' });
   }
 });
+
 
 // Obtener estudiantes de un programa académico específico
 router.get('/programa/:programa_id',
@@ -354,17 +295,17 @@ router.post('/grupo-nombres', async (req, res) => {
   try {
     const resultados = await Promise.all(
       correos.map(async (correo) => {
-        const codigo = correo.split('@')[0];
+            const codigo = correo.split('@')[0];
 
-        try {
-          const response = await axios.get(`http://www.udh.edu.pe/websauh/secretaria_general/gradosytitulos/datos_estudiante_json.aspx?_c_3456=${codigo}`);
-          const data = response.data?.[0];
-          const nombre = `${data.stu_nombres || ''} ${data.stu_apellido_paterno || ''} ${data.stu_apellido_materno || ''}`.trim();
-          return { correo, nombre };
-        } catch (err) {
-          return { correo, nombre: 'NO ENCONTRADO' };
-        }
-      })
+            try {
+              const data = await getDatosAcademicosUDH(codigo);
+              if (!data) return { correo, nombre: 'NO ENCONTRADO' };
+              const nombre = data.nombre_completo || ((data.raw && `${data.raw.stu_nombres || ''} ${data.raw.stu_apellido_paterno || ''} ${data.raw.stu_apellido_materno || ''}`).trim()) || 'NO ENCONTRADO';
+              return { correo, nombre };
+            } catch (err) {
+              return { correo, nombre: 'NO ENCONTRADO' };
+            }
+          })
     );
 
     res.json(resultados);
@@ -389,7 +330,6 @@ router.patch(
         return res.status(400).json({ message: 'Estado inválido. Use: ATENDIDO o NO_ATENDIDO' });
       }
 
-      // 1) Si viene integrante -> actualiza IntegranteGrupo
       if (id_integrante) {
         const integrante = await IntegranteGrupo.findByPk(id_integrante);
         if (!integrante) return res.status(404).json({ message: 'Integrante no encontrado' });
@@ -407,7 +347,6 @@ router.patch(
         });
       }
 
-      // 2) Si viene estudiante -> actualiza Estudiantes
       if (id_estudiante) {
         const estudiante = await Estudiantes.findByPk(id_estudiante);
         if (!estudiante) return res.status(404).json({ message: 'Estudiante no encontrado' });

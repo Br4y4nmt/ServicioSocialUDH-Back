@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const LineaDeAccion = require('../models/LineaDeAccion');
-const LaboresSociales = require('../models/LaboresSociales'); // para incluir en GET
+const LaboresSociales = require('../models/LaboresSociales'); 
 const authMiddleware = require('../middlewares/authMiddleware');
 const verificarRol = require('../middlewares/verificarRol');
 // Crear nueva línea de acción

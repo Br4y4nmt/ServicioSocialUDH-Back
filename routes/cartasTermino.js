@@ -44,7 +44,7 @@ router.post('/',
 
     res.status(201).json(nuevaCarta);
   } catch (error) {
-    console.error('❌ Error al guardar carta de término:', error);
+    console.error('Error al guardar carta de término:', error);
     res.status(500).json({ error: 'Error interno al registrar carta de término' });
   }
 });

@@ -26,6 +26,7 @@ router.get('/:usuario_id',
     res.status(500).json({ error: 'Error al obtener cronograma' });
   }
 });
+
 router.post('/evidencia/:actividad_id',
   authMiddleware,
   verificarRol('alumno'),
@@ -176,6 +177,8 @@ router.patch('/:id/estado',
     res.status(500).json({ message: 'Error al actualizar estado' });
   }
 });
+
+
 router.get('/trabajo/:trabajo_social_id',
   authMiddleware,
   verificarRol('alumno', 'docente supervisor', 'gestor-udh', 'programa-academico'),
@@ -192,6 +195,8 @@ router.get('/trabajo/:trabajo_social_id',
     res.status(500).json({ message: 'Error al obtener cronograma' });
   }
 });
+
+
 router.delete('/evidencia/:actividad_id',
   authMiddleware,
   verificarRol('alumno'),
@@ -222,6 +227,8 @@ router.delete('/evidencia/:actividad_id',
     }
   }
 );
+
+
 router.patch('/:id/observacion',
   authMiddleware,
   verificarRol('docente supervisor', 'gestor-udh', 'programa-academico'),

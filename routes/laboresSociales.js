@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const LaboresSociales = require('../models/LaboresSociales');
-const LineaDeAccion = require('../models/LineaDeAccion'); // Importar modelo correcto
+const LineaDeAccion = require('../models/LineaDeAccion'); 
 const authMiddleware = require('../middlewares/authMiddleware');
 const verificarRol = require('../middlewares/verificarRol');
 
@@ -34,7 +34,7 @@ router.get('/',
     const labores = await LaboresSociales.findAll({
     include: {
       model: LineaDeAccion,
-      as: 'LineaAccion', // <- IMPORTANTE: debe coincidir con el alias del belongsTo
+      as: 'LineaAccion',
       attributes: ['nombre_linea']
     }
   });
@@ -44,6 +44,8 @@ router.get('/',
     res.status(500).json({ message: 'Error al obtener labores sociales', error });
   }
 });
+
+
 // Obtener una labor social por ID
 router.get('/:id_labores',
   authMiddleware,
@@ -53,7 +55,7 @@ router.get('/:id_labores',
     const labores = await LaboresSociales.findAll({
     include: {
       model: LineaDeAccion,
-      as: 'LineaAccion', // <- IMPORTANTE: debe coincidir con el alias del belongsTo
+      as: 'LineaAccion', 
       attributes: ['nombre_linea']
     }
   });
@@ -109,33 +111,7 @@ router.delete('/:id_labores',
     res.status(500).json({ message: 'Error al eliminar la labor social', error });
   }
 });
-// Obtener labores sociales de un docente específico por ID
-// router.get('/docente/:docente_id', async (req, res) => {
-    // const { docente_id } = req.params;  // Obtenemos el ID del docente desde los parámetros de la URL
-    
-    // try {
-      // Filtramos las labores sociales por el ID del docente
-      // const labores = await LaboresSociales.findAll({
-        // where: {
-          // docente_id: docente_id,  // Solo labores sociales del docente con ID `docente_id`
-        // },
-        // include: {
-          // model: Docentes, // Relacionamos el modelo Docentes
-          // attributes: ['nombre_docente'], // Incluir el nombre del docente para referencia
-        // }
-      // });
-  
-      // Si hay labores, respondemos con los datos
-      // if (labores.length > 0) {
-        // res.status(200).json(labores);
-      // } else {
-       //  res.status(404).json({ message: 'No se encontraron labores sociales para este docente.' });
-      // }
-    // } catch (error) {
-     //  console.error('Error al obtener labores sociales del docente:', error);
-     //  res.status(500).json({ message: 'Error al obtener labores sociales del docente', error });
-   //  }
- //  });
+
 router.get('/linea/:id_linea',
   authMiddleware,
   verificarRol('gestor-udh', 'docente supervisor', 'alumno', 'programa-academico'),

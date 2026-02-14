@@ -3,9 +3,11 @@ const router = express.Router();
 const { Op } = require('sequelize'); 
 const Facultades = require('../models/Facultades');
 const Usuarios = require('../models/Usuario');
-const ProgramasAcademicos = require('../models/ProgramasAcademicos');  // Importa el modelo de Programas Académicos
+const ProgramasAcademicos = require('../models/ProgramasAcademicos'); 
 const authMiddleware = require('../middlewares/authMiddleware');
 const verificarRol = require('../middlewares/verificarRol');
+
+
 // Crear un programa académico
 router.post('/',
   authMiddleware,
@@ -83,7 +85,7 @@ router.get('/',
     try {
       const programas = await ProgramasAcademicos.findAll({
         include: {
-          model: Facultades, // ✅ Sin alias
+          model: Facultades, 
           attributes: ['id_facultad', 'nombre_facultad']
         }
       });

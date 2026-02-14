@@ -172,7 +172,7 @@ router.get('/supervisores',
 router.get(
   '/estudiantes-finalizados',
   authMiddleware,
-  verificarRol('gestor-udh', 'programa-academico', 'docente supervisor'),
+  verificarRol('gestor-udh', 'programa-academico'),
   async (req, res) => {
     try {
       const rows = await TrabajoSocialSeleccionado.findAll({
@@ -422,6 +422,7 @@ router.get('/informes-finales',
         attributes: [
           'id',
           'informe_final_pdf',
+          'archivo_plan_social',
           'estado_informe_final',
           'createdAt',
           'certificado_final',
@@ -437,6 +438,8 @@ router.get('/informes-finales',
     }
   });
 
+
+  
 router.delete('/seleccionado/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
 
@@ -1089,52 +1092,6 @@ router.post('/guardar-carta-termino',
     res.status(500).json({ message: 'Error interno al guardar carta de término', error });
   }
 });
-router.get('/informes-finales/programa/:programa_academico_id',
-  authMiddleware,
-  verificarRol('docente supervisor', 'gestor-udh', 'programa-academico'),
-  async (req, res) => {
-    try {
-      const { programa_academico_id } = req.params;
-
-      const informes = await TrabajoSocialSeleccionado.findAll({
-        where: {
-          programa_academico_id,
-          informe_final_pdf: { [require('sequelize').Op.ne]: null }
-        },
-        include: [
-          {
-            model: Estudiantes,
-            attributes: ['nombre_estudiante']
-          },
-          {
-            model: ProgramasAcademicos,
-            attributes: ['nombre_programa']
-          },
-          {
-            model: Facultades,
-            as: 'Facultad',
-            attributes: ['nombre_facultad']
-          }
-        ],
-        attributes: [
-          'id',
-          'informe_final_pdf',
-          'estado_informe_final',
-          'createdAt',
-          'certificado_final',
-          'tipo_servicio_social', 
-          'usuario_id'            
-        ]
-      });
-
-      res.status(200).json(informes);
-    } catch (error) {
-      console.error('Error al obtener informes finales:', error);
-      res.status(500).json({ message: 'Error interno al obtener informes finales', error });
-    }
-  });
-
-
 
 router.patch('/estado/:id',
   authMiddleware,

@@ -99,6 +99,4 @@ router.get('/:trabajo_id/:codigo',
   }
 );
 
-
-
 module.exports = router;

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const Facultades = require('../models/Facultades');  // Importa el modelo de Facultades
+const Facultades = require('../models/Facultades');  
 const authMiddleware = require('../middlewares/authMiddleware');
 const verificarRol = require('../middlewares/verificarRol');
 // Crear una nueva facultad
