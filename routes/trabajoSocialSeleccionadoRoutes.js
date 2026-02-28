@@ -437,8 +437,59 @@ router.get('/informes-finales',
       res.status(500).json({ message: 'Error interno al obtener informes finales', error });
     }
   });
+  
 
+router.get(
+  '/informes-finales-nuevo',
+  authMiddleware,
+  verificarRol('gestor-udh'),
+  async (req, res) => {
+    try {
+      const { Op } = require('sequelize');
 
+      const informes = await TrabajoSocialSeleccionado.findAll({
+        where: {
+          informe_final_pdf: { [Op.ne]: null },
+          estado_informe_final: 'aprobado'
+        },
+        include: [
+          {
+            model: Estudiantes,
+            attributes: ['nombre_estudiante']
+          },
+          {
+            model: ProgramasAcademicos,
+            attributes: ['nombre_programa']
+          },
+          {
+            model: Facultades,
+            as: 'Facultad',
+            attributes: ['nombre_facultad']
+          }
+        ],
+        attributes: [
+          'id',
+          'informe_final_pdf',
+          'archivo_plan_social',
+          'estado_informe_final',
+          'createdAt',
+          'certificado_final',
+          'tipo_servicio_social',
+          'usuario_id'
+        ],
+        order: [['createdAt', 'DESC']]
+      });
+
+      res.status(200).json(informes);
+    } catch (error) {
+      console.error('Error al obtener informes finales aprobados:', error);
+      res.status(500).json({
+        message: 'Error interno al obtener informes finales aprobados',
+        error
+      });
+    }
+  }
+);
   
 router.delete('/seleccionado/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
@@ -662,6 +713,8 @@ router.get('/usuario/:usuario_id',
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
+
+
 
 router.get('/docente/:docente_id',
   authMiddleware,
