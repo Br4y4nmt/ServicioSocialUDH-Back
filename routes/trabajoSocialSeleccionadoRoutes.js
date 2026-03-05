@@ -406,7 +406,7 @@ router.get('/informes-finales',
         where: {
           docente_id: docente.id_docente,
           informe_final_pdf: { [Op.ne]: null },
-          estado_informe_final: 'pendiente',
+          estado_informe_final: { [Op.in]: ['pendiente', 'aprobado'] },
           carta_termino_pdf: { [Op.ne]: null }
         },
         include: [
