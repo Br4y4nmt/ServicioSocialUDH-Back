@@ -94,7 +94,6 @@ const storageCartaTermino = multer.diskStorage({
 });
 
 
-// 📄 Configuración para guardar el informe final
 const storageInformeFinal = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, 'uploads/informes_finales'); 
@@ -104,6 +103,7 @@ const storageInformeFinal = multer.diskStorage({
     cb(null, uniqueName);
   }
 });
+
 const uploadInformeFinal = multer({
   storage: storageInformeFinal,
   fileFilter: function (req, file, cb) {
@@ -114,6 +114,7 @@ const uploadInformeFinal = multer({
     cb(null, true);
   }
 });
+
 const uploadCartaTermino = multer({
   storage: storageCartaTermino,
   fileFilter: function (req, file, cb) {
@@ -242,11 +243,10 @@ router.get(
             const codigoTest = correoTest.includes('@') ? correoTest.split('@')[0] : correoTest;
 
             const test = await getDatosAcademicosUDH(codigoTest);
-            if (!test) udhDown = true; // <- tu service devuelve null cuando falla
+            if (!test) udhDown = true; 
           }
         }
       } catch (e) {
-        // Si el test falla por cualquier motivo, lo tratamos como "down"
         udhDown = true;
       }
 
@@ -264,7 +264,6 @@ router.get(
             createdAt: p.createdAt
           };
 
-          // ✅ Si es grupal: traer integrantes + estado desde BD + (si UDH está OK) consultar UDH
           if ((p.tipo_servicio_social || '').toString().trim().toLowerCase() === 'grupal') {
             const integrantesDB = await IntegranteGrupo.findAll({
               where: { trabajo_social_id: p.id },
@@ -284,7 +283,6 @@ router.get(
                 const correo = (plain.correo_institucional || '').trim();
                 const codigo = correo.includes('@') ? correo.split('@')[0] : correo;
 
-                // ✅ Si UDH está caída, NO llamamos la API externa (evita timeouts por integrante)
                 if (udhDown) {
                   return {
                     id_estudiante: null,
@@ -309,10 +307,8 @@ router.get(
                   };
                 }
 
-                // ✅ UDH OK: consultamos la API externa
                 const udh = await getDatosAcademicosUDH(codigo);
 
-                // Si tu service devolvió null, igualmente devolvemos el integrante
                 if (!udh) {
                   return {
                     id_estudiante: null,
@@ -336,9 +332,6 @@ router.get(
                     }
                   };
                 }
-
-                // ✅ Tu service ya devuelve:
-                // { nombre_completo, dni, codigo, facultad, programa, ciclo }
                 return {
                   id_estudiante: null,
                   id_usuario: null,
@@ -397,12 +390,24 @@ router.get(
 
 router.get('/informes-finales',
   authMiddleware,
-  verificarRol('docente supervisor', 'gestor-udh', 'programa-academico'),
+  verificarRol('docente supervisor', 'gestor-udh'),
   async (req, res) => {
     try {
+      const docente = await Docentes.findOne({
+        where: { id_usuario: req.user.id },
+        attributes: ['id_docente']
+      });
+
+      if (!docente) {
+        return res.status(404).json({ message: 'Docente no encontrado para el usuario logueado' });
+      }
+
       const informes = await TrabajoSocialSeleccionado.findAll({
         where: {
-          informe_final_pdf: { [require('sequelize').Op.ne]: null }
+          docente_id: docente.id_docente,
+          informe_final_pdf: { [Op.ne]: null },
+          estado_informe_final: 'pendiente',
+          carta_termino_pdf: { [Op.ne]: null }
         },
         include: [
           {
@@ -509,6 +514,8 @@ router.delete('/seleccionado/:id', authMiddleware, async (req, res) => {
     res.status(500).json({ message: 'Error al eliminar la elección' });
   }
 });
+
+
 // 📩 Ruta para guardar el informe final generado desde el frontend
 router.post('/guardar-informe-final',
   authMiddleware,
@@ -1151,11 +1158,16 @@ router.patch('/estado/:id',
   verificarRol('docente supervisor', 'gestor-udh', 'programa-academico'),
   async (req, res) => {
   const { id } = req.params;
-  const { nuevo_estado } = req.body;
+  const { nuevo_estado, observacion } = req.body;
 
   const estadosValidos = ['pendiente', 'aprobado', 'rechazado'];
   if (!estadosValidos.includes(nuevo_estado)) {
     return res.status(400).json({ message: 'Estado inválido' });
+  }
+
+  // Si es rechazado, la observación es obligatoria
+  if (nuevo_estado === 'rechazado' && (!observacion || observacion.trim() === '')) {
+    return res.status(400).json({ message: 'Debe proporcionar una observación al rechazar el informe' });
   }
 
   try {
@@ -1163,6 +1175,16 @@ router.patch('/estado/:id',
 
     if (!trabajo) {
       return res.status(404).json({ message: 'Trabajo social no encontrado' });
+    }
+
+    // Si es rechazado, guardar la observación
+    if (nuevo_estado === 'rechazado') {
+      await ObservacionTrabajoSocial.create({
+        trabajo_id: id,
+        usuario_id: req.user.id,
+        tipo: 'rechazo_informe',
+        observacion: observacion.trim()
+      });
     }
 
     trabajo.estado_informe_final = nuevo_estado;
@@ -1733,6 +1755,54 @@ router.put(
       console.error('Error al actualizar el asesor:', error);
       res.status(500).json({
         message: 'Error interno al actualizar el asesor.',
+        error: error.message,
+      });
+    }
+  }
+);
+
+// Ruta para obtener el motivo de rechazo del informe final
+router.get(
+  '/motivo-rechazo-informe/:trabajoId',
+  authMiddleware,
+  verificarRol('alumno'),
+  async (req, res) => {
+    try {
+      const { trabajoId } = req.params;
+
+      const trabajo = await TrabajoSocialSeleccionado.findByPk(trabajoId);
+      if (!trabajo) {
+        return res.status(404).json({ message: 'Trabajo social no encontrado.' });
+      }
+
+      if (trabajo.estado_informe_final !== 'rechazado') {
+        return res.status(400).json({
+          message: 'Este informe no se encuentra rechazado, no hay motivo que mostrar.'
+        });
+      }
+
+      const observacion = await ObservacionTrabajoSocial.findOne({
+        where: {
+          trabajo_id: trabajoId,
+          tipo: 'rechazo_informe',
+        },
+        order: [['createdAt', 'DESC']],
+      });
+
+      if (!observacion) {
+        return res.status(404).json({
+          message: 'No se encontró un motivo de rechazo registrado.'
+        });
+      }
+
+      return res.json({
+        motivo: observacion.observacion,
+        fecha: observacion.createdAt,
+      });
+    } catch (error) {
+      console.error('Error al obtener motivo de rechazo del informe:', error);
+      return res.status(500).json({
+        message: 'Error interno al obtener el motivo de rechazo.',
         error: error.message,
       });
     }
