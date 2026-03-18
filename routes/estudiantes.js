@@ -284,37 +284,6 @@ router.put('/actualizar-celular/:usuario_id',
   }
 );
 
-
-router.post('/grupo-nombres', async (req, res) => {
-  const { correos } = req.body;
-
-  if (!correos || !Array.isArray(correos)) {
-    return res.status(400).json({ message: 'Se requiere un arreglo de correos.' });
-  }
-
-  try {
-    const resultados = await Promise.all(
-      correos.map(async (correo) => {
-            const codigo = correo.split('@')[0];
-
-            try {
-              const data = await getDatosAcademicosUDH(codigo);
-              if (!data) return { correo, nombre: 'NO ENCONTRADO' };
-              const nombre = data.nombre_completo || ((data.raw && `${data.raw.stu_nombres || ''} ${data.raw.stu_apellido_paterno || ''} ${data.raw.stu_apellido_materno || ''}`).trim()) || 'NO ENCONTRADO';
-              return { correo, nombre };
-            } catch (err) {
-              return { correo, nombre: 'NO ENCONTRADO' };
-            }
-          })
-    );
-
-    res.json(resultados);
-  } catch (error) {
-    console.error('Error al obtener nombres del grupo:', error);
-    res.status(500).json({ message: 'Error al obtener nombres del grupo', error });
-  }
-});
-
 router.patch(
   '/:id_estudiante/estado',
   authMiddleware,

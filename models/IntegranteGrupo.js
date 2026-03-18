@@ -21,8 +21,37 @@ IntegranteGrupo.init(
       onDelete: 'CASCADE'
     },
 
+    nombre_completo: {
+      type: DataTypes.STRING(150),
+      allowNull: false
+    },
+
+    dni: {
+      type: DataTypes.STRING(8),
+      allowNull: false,
+      validate: {
+        len: [8, 8],
+        isNumeric: true
+      }
+    },
+
+    facultad: {
+      type: DataTypes.STRING(150),
+      allowNull: false
+    },
+
+    programa_academico: {
+      type: DataTypes.STRING(200),
+      allowNull: false
+    },
+
+    codigo: {
+      type: DataTypes.STRING(20),
+      allowNull: false
+    },
+
     correo_institucional: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING(150),
       allowNull: false,
       validate: {
         isEmail: true
@@ -30,7 +59,7 @@ IntegranteGrupo.init(
     },
 
     estado: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING(30),
       allowNull: false,
       defaultValue: 'NO_ATENDIDO'
     }

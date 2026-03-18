@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { CertificadoFinalMiembro } = require('../models');
+const { CertificadoFinalMiembro, IntegranteGrupo} = require('../models');
 const authMiddleware = require('../middlewares/authMiddleware');
 const verificarRol = require('../middlewares/verificarRol');
 
@@ -22,7 +22,8 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-router.post('/',
+router.post(
+  '/',
   authMiddleware,
   verificarRol('docente supervisor', 'gestor-udh'),
   upload.single('archivo'),
@@ -32,19 +33,87 @@ router.post('/',
       const archivo = req.file;
 
       if (!trabajo_id || !codigo_universitario || !archivo) {
-        return res.status(400).json({ error: 'Faltan campos obligatorios o archivo' });
+        return res.status(400).json({
+          error: 'Faltan campos obligatorios o archivo'
+        });
       }
 
-      const nuevoCertificado = await CertificadoFinalMiembro.create({
-        trabajo_id,
-        codigo_universitario,
-        nombre_archivo_pdf: archivo.filename
+      const trabajoIdNum = Number(trabajo_id);
+      const codigo = String(codigo_universitario).trim();
+
+      if (!Number.isInteger(trabajoIdNum) || trabajoIdNum <= 0) {
+        return res.status(400).json({ error: 'trabajo_id inválido' });
+      }
+
+      if (!/^\d{10}$/.test(codigo)) {
+        return res.status(400).json({ error: 'codigo_universitario inválido' });
+      }
+
+      if (!archivo.filename) {
+        return res.status(400).json({
+          error: 'El archivo no tiene filename. Verifica la configuración de multer.'
+        });
+      }
+
+      const integranteDelGrupo = await IntegranteGrupo.findOne({
+        where: {
+          trabajo_social_id: trabajoIdNum,
+          codigo: codigo
+        },
+        attributes: [
+          'id_integrante',
+          'codigo',
+          'correo_institucional',
+          'nombre_completo',
+          'facultad',
+          'programa_academico'
+        ]
       });
 
-      res.status(201).json(nuevoCertificado);
+      if (!integranteDelGrupo) {
+        return res.status(404).json({
+          error: 'El integrante no pertenece a este grupo'
+        });
+      }
+
+      const existente = await CertificadoFinalMiembro.findOne({
+        where: {
+          trabajo_id: trabajoIdNum,
+          codigo_universitario: codigo
+        }
+      });
+
+      let certificadoGuardado;
+
+      if (existente) {
+        await existente.update({
+          nombre_archivo_pdf: archivo.filename
+        });
+        certificadoGuardado = existente;
+      } else {
+        certificadoGuardado = await CertificadoFinalMiembro.create({
+          trabajo_id: trabajoIdNum,
+          codigo_universitario: codigo,
+          nombre_archivo_pdf: archivo.filename
+        });
+      }
+
+      return res.status(201).json({
+        ...certificadoGuardado.toJSON(),
+        integrante: {
+          nombre_completo: integranteDelGrupo.nombre_completo,
+          codigo: integranteDelGrupo.codigo,
+          correo_institucional: integranteDelGrupo.correo_institucional,
+          facultad: integranteDelGrupo.facultad,
+          programa_academico: integranteDelGrupo.programa_academico
+        }
+      });
     } catch (error) {
       console.error('Error al guardar certificado final del miembro:', error);
-      res.status(500).json({ error: 'Error interno al registrar certificado' });
+      return res.status(500).json({
+        error: 'Error interno al registrar certificado',
+        detalle: error.message
+      });
     }
   }
 );
@@ -54,16 +123,50 @@ router.get('/grupo/:trabajo_id',
   verificarRol('alumno', 'docente supervisor', 'gestor-udh', 'programa-academico'),
   async (req, res) => {
     const { trabajo_id } = req.params;
+
     try {
-      const certificados = await CertificadoFinalMiembro.findAll({
-        where: { trabajo_id },
-        attributes: ['nombre_archivo_pdf', 'codigo_universitario']
+      const idTrabajo = Number(trabajo_id);
+
+      if (!Number.isInteger(idTrabajo) || idTrabajo <= 0) {
+        return res.status(400).json({ error: 'trabajo_id inválido' });
+      }
+
+      const [certificados, integrantes] = await Promise.all([
+        CertificadoFinalMiembro.findAll({
+          where: { trabajo_id: idTrabajo },
+          attributes: ['nombre_archivo_pdf', 'codigo_universitario']
+        }),
+        IntegranteGrupo.findAll({
+          where: { trabajo_social_id: idTrabajo },
+          attributes: ['correo_institucional', 'nombre_completo']
+        })
+      ]);
+
+      const nombrePorCodigo = {};
+      for (const integrante of integrantes) {
+        const codigo = String(integrante.correo_institucional || '')
+          .split('@')[0]
+          .trim();
+
+        if (codigo) {
+          nombrePorCodigo[codigo] = integrante.nombre_completo || null;
+        }
+      }
+
+      const resultado = certificados.map((certificado) => {
+        const codigo = String(certificado.codigo_universitario || '').trim();
+
+        return {
+          nombre_archivo_pdf: certificado.nombre_archivo_pdf,
+          codigo_universitario: codigo,
+          nombre_completo: nombrePorCodigo[codigo] || null
+        };
       });
 
-      res.status(200).json(certificados);
+      return res.status(200).json(resultado);
     } catch (error) {
-      console.error(' Error al obtener certificados del grupo:', error);
-      res.status(500).json({ error: 'Error del servidor' });
+      console.error('Error al obtener certificados del grupo:', error);
+      return res.status(500).json({ error: 'Error del servidor' });
     }
   }
 );

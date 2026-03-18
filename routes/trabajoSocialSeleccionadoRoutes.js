@@ -223,33 +223,6 @@ router.get(
         order: [['createdAt', 'DESC']]
       });
 
-      let udhDown = false;
-      
-      try {
-        const primerGrupal = rows.find((r) => {
-          const p = r.get({ plain: true });
-          return (p.tipo_servicio_social || '').toString().trim().toLowerCase() === 'grupal';
-        });
-
-        if (primerGrupal) {
-          const pTest = primerGrupal.get({ plain: true });
-          const igTest = await IntegranteGrupo.findOne({
-            where: { trabajo_social_id: pTest.id },
-            attributes: ['correo_institucional']
-          });
-
-          if (igTest) {
-            const correoTest = (igTest.correo_institucional || '').trim();
-            const codigoTest = correoTest.includes('@') ? correoTest.split('@')[0] : correoTest;
-
-            const test = await getDatosAcademicosUDH(codigoTest);
-            if (!test) udhDown = true; 
-          }
-        }
-      } catch (e) {
-        udhDown = true;
-      }
-
       const data = await Promise.all(
         rows.map(async (r) => {
           const p = r.get({ plain: true });
@@ -271,96 +244,48 @@ router.get(
                 'id_integrante',
                 'trabajo_social_id',
                 'correo_institucional',
+                'codigo',
+                'nombre_completo',
+                'dni',
+                'facultad',
+                'programa_academico',
                 'estado',
                 'createdAt',
                 'updatedAt'
-              ]
+              ],
+              order: [['id_integrante', 'ASC']]
             });
 
-            const integrantes = await Promise.all(
-              integrantesDB.map(async (ig) => {
-                const plain = ig.get({ plain: true });
-                const correo = (plain.correo_institucional || '').trim();
-                const codigo = correo.includes('@') ? correo.split('@')[0] : correo;
+            trabajo.integrantes_grupo = integrantesDB.map((ig) => {
+              const plain = ig.get({ plain: true });
+              const correo = (plain.correo_institucional || '').trim();
+              const codigo = plain.codigo || (correo.includes('@') ? correo.split('@')[0] : null);
 
-                if (udhDown) {
-                  return {
-                    id_estudiante: null,
-                    id_usuario: null,
-                    nombre_estudiante: null,
-                    dni: null,
-                    email: correo || null,
-                    codigo: codigo || null,
-                    celular: null,
-                    sede: null,
-                    modalidad: null,
-                    estado: plain.estado || 'NO_ATENDIDO',
-                    programa: null,
-                    facultad: null,
-                    __integrante_grupo: {
-                      id_integrante: plain.id_integrante,
-                      trabajo_social_id: plain.trabajo_social_id,
-                      correo_institucional: correo,
-                      estado: plain.estado || 'NO_ATENDIDO',
-                      error_udh: 'UDH_DOWN'
-                    }
-                  };
+              return {
+                id_estudiante: null,
+                id_usuario: null,
+                nombre_estudiante: plain.nombre_completo || null,
+                dni: plain.dni || null,
+                email: correo || null,
+                codigo: codigo || null,
+                celular: null, 
+                sede: null,    
+                modalidad: null, 
+                estado: plain.estado || 'NO_ATENDIDO',
+                programa: plain.programa_academico
+                  ? { id_programa: null, nombre_programa: plain.programa_academico }
+                  : null,
+                facultad: plain.facultad
+                  ? { id_facultad: null, nombre_facultad: plain.facultad }
+                  : null,
+                __integrante_grupo: {
+                  id_integrante: plain.id_integrante,
+                  trabajo_social_id: plain.trabajo_social_id,
+                  correo_institucional: correo,
+                  estado: plain.estado || 'NO_ATENDIDO'
                 }
-
-                const udh = await getDatosAcademicosUDH(codigo);
-
-                if (!udh) {
-                  return {
-                    id_estudiante: null,
-                    id_usuario: null,
-                    nombre_estudiante: null,
-                    dni: null,
-                    email: correo || null,
-                    codigo: codigo || null,
-                    celular: null,
-                    sede: null,
-                    modalidad: null,
-                    estado: plain.estado || 'NO_ATENDIDO',
-                    programa: null,
-                    facultad: null,
-                    __integrante_grupo: {
-                      id_integrante: plain.id_integrante,
-                      trabajo_social_id: plain.trabajo_social_id,
-                      correo_institucional: correo,
-                      estado: plain.estado || 'NO_ATENDIDO',
-                      error_udh: 'UDH_NULL'
-                    }
-                  };
-                }
-                return {
-                  id_estudiante: null,
-                  id_usuario: null,
-                  nombre_estudiante: udh.nombre_completo || null,
-                  dni: udh.dni || null,
-                  email: correo || null,
-                  codigo: udh.codigo || codigo || null,
-                  celular: udh.celular || null,
-                  sede: udh.sede || null,
-                  modalidad: udh.modalidad || null,
-                  estado: plain.estado || 'NO_ATENDIDO',
-                  programa: udh.programa
-                    ? { id_programa: null, nombre_programa: udh.programa }
-                    : null,
-                  facultad: udh.facultad
-                    ? { id_facultad: null, nombre_facultad: udh.facultad }
-                    : null,
-                  ciclo: udh.ciclo ?? null,
-                  __integrante_grupo: {
-                    id_integrante: plain.id_integrante,
-                    trabajo_social_id: plain.trabajo_social_id,
-                    correo_institucional: correo,
-                    estado: plain.estado || 'NO_ATENDIDO'
-                  }
-                };
-              })
-            );
-
-            trabajo.integrantes_grupo = integrantes;
+              };
+            });
           }
 
           return {
@@ -373,9 +298,7 @@ router.get(
       return res.status(200).json({
         total: data.length,
         data,
-        meta: {
-          udhDown
-        }
+        meta: { udhDown: false } 
       });
     } catch (error) {
       console.error('Error en /estudiantes-finalizados:', error);
@@ -547,7 +470,8 @@ router.post('/guardar-informe-final',
   }
 });
 
-router.post('/',
+router.post(
+  '/',
   authMiddleware,
   verificarRol('alumno'),
   async (req, res) => {
@@ -562,10 +486,9 @@ router.post('/',
         facultad_id,
         tipo_servicio_social,
         linea_accion_id,
-        correos // 👈 NUEVO: viene del frontend cuando es grupal
+        integrantes
       } = req.body;
 
-      // Validaciones base
       if (!usuario_id || isNaN(usuario_id)) {
         await t.rollback();
         return res.status(400).json({ message: 'usuario_id inválido' });
@@ -576,84 +499,290 @@ router.post('/',
         return res.status(400).json({ message: 'facultad_id inválido' });
       }
 
+      if (!programa_academico_id || isNaN(programa_academico_id)) {
+        await t.rollback();
+        return res.status(400).json({ message: 'programa_academico_id inválido' });
+      }
+
+      if (!docente_id || isNaN(docente_id)) {
+        await t.rollback();
+        return res.status(400).json({ message: 'docente_id inválido' });
+      }
+
+      if (!labor_social_id || isNaN(labor_social_id)) {
+        await t.rollback();
+        return res.status(400).json({ message: 'labor_social_id inválido' });
+      }
+
+      if (!linea_accion_id || isNaN(linea_accion_id)) {
+        await t.rollback();
+        return res.status(400).json({ message: 'linea_accion_id inválido' });
+      }
+
       if (!['individual', 'grupal'].includes(tipo_servicio_social)) {
         await t.rollback();
         return res.status(400).json({ message: 'tipo_servicio_social inválido' });
       }
 
-      // ✅ Si es grupal, validar correos ANTES de crear el trabajo
-      let correosNorm = [];
+      let integrantesProcesados = [];
+
       if (tipo_servicio_social === 'grupal') {
-        if (!Array.isArray(correos)) {
-          await t.rollback();
-          return res.status(400).json({ message: 'Debes enviar un arreglo de correos' });
-        }
-
-        // Normalizar
-        correosNorm = correos
-          .map(c => String(c || '').trim().toLowerCase())
-          .filter(Boolean);
-
-        if (correosNorm.length === 0) {
-          await t.rollback();
-          return res.status(400).json({ message: 'No se enviaron correos válidos' });
-        }
-
-        // Dominio UDH
-        const invalidos = correosNorm.filter(c => !c.endsWith('@udh.edu.pe'));
-        if (invalidos.length) {
+        if (!Array.isArray(integrantes)) {
           await t.rollback();
           return res.status(400).json({
-            message: 'Hay correos con dominio inválido (solo @udh.edu.pe)',
-            invalidos
+            message: 'Debes enviar un arreglo de integrantes'
           });
         }
 
-        // Duplicados dentro del request
-        const seen = new Set();
-        const duplicadosReq = new Set();
-        for (const c of correosNorm) {
-          if (seen.has(c)) duplicadosReq.add(c);
-          else seen.add(c);
+        if (integrantes.length === 0) {
+          await t.rollback();
+          return res.status(400).json({
+            message: 'Debes enviar al menos un integrante'
+          });
         }
 
-        if (duplicadosReq.size > 0) {
+        // Permite recibir:
+        // integrantes: ["2019110518", "2018112233"]
+        // o
+        // integrantes: [{ codigo: "2019110518" }, { codigo: "2018112233" }]
+        const codigos = integrantes
+          .map(item => {
+            if (typeof item === 'string' || typeof item === 'number') {
+              return String(item).trim();
+            }
+            if (item && item.codigo) {
+              return String(item.codigo).trim();
+            }
+            return '';
+          })
+          .filter(Boolean);
+
+        if (codigos.length === 0) {
+          await t.rollback();
+          return res.status(400).json({
+            message: 'No se enviaron códigos válidos'
+          });
+        }
+
+        const codigoPropioEnIntegrantes = await Estudiantes.findOne({
+          where: {
+            id_usuario: parseInt(usuario_id),
+            codigo: { [Op.in]: codigos }
+          },
+          attributes: ['codigo'],
+          transaction: t
+        });
+
+        if (codigoPropioEnIntegrantes) {
           await t.rollback();
           return res.status(409).json({
-            message: 'Hay correos repetidos en el envío',
-            duplicados: [...duplicadosReq]
+            message: 'No puedes agregarte a ti mismo como integrante del grupo',
+            codigo_conflictivo: codigoPropioEnIntegrantes.codigo
+          });
+        }
+
+        const seen = new Set();
+        const duplicados = new Set();
+
+        for (const codigo of codigos) {
+          if (seen.has(codigo)) duplicados.add(codigo);
+          else seen.add(codigo);
+        }
+
+        if (duplicados.size > 0) {
+          await t.rollback();
+          return res.status(409).json({
+            message: 'Hay códigos repetidos en el envío',
+            duplicados: [...duplicados]
+          });
+        }
+
+        const resultados = await Promise.all(
+          codigos.map(async (codigo) => {
+            const datos = await getDatosAcademicosUDH(codigo);
+            return { codigoSolicitado: codigo, datos };
+          })
+        );
+
+        const noEncontrados = resultados
+          .filter(r => !r.datos)
+          .map(r => r.codigoSolicitado);
+
+        if (noEncontrados.length > 0) {
+          await t.rollback();
+          return res.status(404).json({
+            message: 'No se encontraron datos académicos para algunos códigos',
+            codigos_no_encontrados: noEncontrados
+          });
+        }
+
+        const sinCorreo = resultados
+          .filter(r => !r.datos.email)
+          .map(r => r.codigoSolicitado);
+
+        if (sinCorreo.length > 0) {
+          await t.rollback();
+          return res.status(400).json({
+            message: 'Algunos estudiantes no tienen correo institucional en la consulta externa',
+            codigos_sin_correo: sinCorreo
+          });
+        }
+
+        const correosInvalidos = resultados
+          .filter(r => !String(r.datos.email).toLowerCase().endsWith('@udh.edu.pe'))
+          .map(r => ({
+            codigo: r.codigoSolicitado,
+            correo: r.datos.email
+          }));
+
+        if (correosInvalidos.length > 0) {
+          await t.rollback();
+          return res.status(400).json({
+            message: 'Algunos correos recuperados no tienen dominio @udh.edu.pe',
+            correos_invalidos: correosInvalidos
+          });
+        }
+
+        const correosSet = new Set();
+        const correosDuplicados = new Set();
+
+        for (const r of resultados) {
+          const correo = String(r.datos.email).trim().toLowerCase();
+          if (correosSet.has(correo)) {
+            correosDuplicados.add(correo);
+          } else {
+            correosSet.add(correo);
+          }
+        }
+
+        if (correosDuplicados.size > 0) {
+          await t.rollback();
+          return res.status(409).json({
+            message: 'La consulta devolvió correos institucionales repetidos',
+            correos_duplicados: [...correosDuplicados]
+          });
+        }
+
+        integrantesProcesados = resultados.map(r => ({
+          trabajo_social_id: null, // se asigna luego
+          nombre_completo: r.datos.nombre_completo || '',
+          dni: r.datos.dni || '',
+          facultad: r.datos.facultad || '',
+          programa_academico: r.datos.programa || '',
+          codigo: r.datos.codigo || r.codigoSolicitado,
+          correo_institucional: String(r.datos.email).trim().toLowerCase(),
+          estado: 'NO_ATENDIDO'
+        }));
+
+        const incompletos = integrantesProcesados.filter(i =>
+          !i.nombre_completo ||
+          !i.dni ||
+          !i.facultad ||
+          !i.programa_academico ||
+          !i.codigo ||
+          !i.correo_institucional
+        );
+
+        if (incompletos.length > 0) {
+          await t.rollback();
+          return res.status(400).json({
+            message: 'Algunos integrantes tienen datos incompletos desde la API externa',
+            integrantes_incompletos: incompletos.map(i => ({
+              codigo: i.codigo,
+              nombre_completo: i.nombre_completo,
+              dni: i.dni,
+              facultad: i.facultad,
+              programa_academico: i.programa_academico,
+              correo_institucional: i.correo_institucional
+            }))
+          });
+        }
+
+        const codigosIntegrantes = integrantesProcesados
+          .map(i => String(i.codigo).trim())
+          .filter(Boolean);
+
+        const correosIntegrantes = integrantesProcesados
+          .map(i => String(i.correo_institucional).trim().toLowerCase())
+          .filter(Boolean);
+
+        const integrantesYaRegistrados = await IntegranteGrupo.findAll({
+          where: {
+            [Op.or]: [
+              { codigo: { [Op.in]: codigosIntegrantes } },
+              { correo_institucional: { [Op.in]: correosIntegrantes } }
+            ]
+          },
+          attributes: ['trabajo_social_id', 'codigo', 'correo_institucional'],
+          transaction: t
+        });
+
+        if (integrantesYaRegistrados.length > 0) {
+          const conflictosCodigo = [
+            ...new Set(
+              integrantesYaRegistrados
+                .map(i => i.codigo)
+                .filter(Boolean)
+            )
+          ];
+
+          const conflictosCorreo = [
+            ...new Set(
+              integrantesYaRegistrados
+                .map(i => String(i.correo_institucional || '').trim().toLowerCase())
+                .filter(Boolean)
+            )
+          ];
+
+          const trabajosRelacionados = [
+            ...new Set(
+              integrantesYaRegistrados
+                .map(i => i.trabajo_social_id)
+                .filter(Boolean)
+            )
+          ];
+
+          await t.rollback();
+          return res.status(409).json({
+            message: 'Algunos integrantes ya pertenecen a otro trabajo social',
+            codigos_conflictivos: conflictosCodigo,
+            correos_conflictivos: conflictosCorreo,
+            trabajos_sociales_relacionados: trabajosRelacionados
           });
         }
       }
 
-      // ✅ 1) Crear trabajo social (aún NO se confirma)
-      const nuevoRegistro = await TrabajoSocialSeleccionado.create({
-        usuario_id: parseInt(usuario_id),
-        programa_academico_id: parseInt(programa_academico_id),
-        docente_id: parseInt(docente_id),
-        labor_social_id: parseInt(labor_social_id),
-        facultad_id: parseInt(facultad_id),
-        tipo_servicio_social,
-        linea_accion_id: parseInt(linea_accion_id)
-      }, { transaction: t });
+      const nuevoRegistro = await TrabajoSocialSeleccionado.create(
+        {
+          usuario_id: parseInt(usuario_id),
+          programa_academico_id: parseInt(programa_academico_id),
+          docente_id: parseInt(docente_id),
+          labor_social_id: parseInt(labor_social_id),
+          facultad_id: parseInt(facultad_id),
+          tipo_servicio_social,
+          linea_accion_id: parseInt(linea_accion_id)
+        },
+        { transaction: t }
+      );
 
-      // ✅ 2) Si es grupal, guardar integrantes en la misma transacción
       if (tipo_servicio_social === 'grupal') {
-        await IntegranteGrupo.bulkCreate(
-          correosNorm.map(correo => ({
-            trabajo_social_id: nuevoRegistro.id,
-            correo_institucional: correo
-          })),
-          { validate: true, transaction: t }
-        );
+        const integrantesFinal = integrantesProcesados.map(i => ({
+          ...i,
+          trabajo_social_id: nuevoRegistro.id
+        }));
+
+        await IntegranteGrupo.bulkCreate(integrantesFinal, {
+          validate: true,
+          transaction: t
+        });
       }
 
-      // ✅ 3) Confirmar todo
       await t.commit();
 
       return res.status(201).json({
         message: 'Trabajo social creado correctamente',
-        id: nuevoRegistro.id
+        id: nuevoRegistro.id,
+        total_integrantes: tipo_servicio_social === 'grupal' ? integrantesProcesados.length : 0
       });
 
     } catch (error) {
@@ -838,6 +967,17 @@ router.get(
       const camposActualizar = {};
       if (estado_plan_labor_social) camposActualizar.estado_plan_labor_social = estado_plan_labor_social;
       if (conformidad_plan_social) camposActualizar.conformidad_plan_social = conformidad_plan_social;
+
+      const debeEliminarIntegrantes =
+        trabajoSocial.tipo_servicio_social === 'grupal' &&
+        (estado_plan_labor_social === 'rechazado' || conformidad_plan_social === 'rechazado');
+
+      if (debeEliminarIntegrantes) {
+        await IntegranteGrupo.destroy({
+          where: { trabajo_social_id: trabajoSocial.id }
+        });
+      }
+
       if (conformidad_plan_social === 'rechazado' && trabajoSocial.archivo_plan_social) {
         const rutaArchivo = path.join(__dirname, '..', 'uploads', 'planes_labor_social', trabajoSocial.archivo_plan_social);
 
@@ -961,7 +1101,7 @@ router.post('/guardar-pdf-html',
 });
 
 
-// 🔍 Ver / verificar certificado final del estudiante principal (QR)
+
 router.get('/certificado-final/:trabajo_id', async (req, res) => {
   try {
     const { trabajo_id } = req.params;

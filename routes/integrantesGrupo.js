@@ -3,7 +3,7 @@ const router = express.Router();
 const { IntegranteGrupo, TrabajoSocialSeleccionado, Usuario} = require('../models');
 const authMiddleware = require('../middlewares/authMiddleware');
 const verificarRol = require('../middlewares/verificarRol');
-const { getDatosAcademicosUDH } = require('../services/udhService');
+
 
 
 router.post('/',
@@ -79,35 +79,52 @@ router.post('/',
 );
 
 
-// Obtener los integrantes por ID del trabajo social
-router.get('/:trabajo_social_id',
+router.get(
+  '/:trabajo_social_id',
   authMiddleware,
-  verificarRol('alumno', 'docente supervisor', 'gestor-udh', 'programa-academico'),
+  verificarRol('alumno', 'docente supervisor', 'gestor-udh'),
   async (req, res) => {
-  try {
-    const { trabajo_social_id } = req.params;
+    try {
+      const { trabajo_social_id } = req.params;
+      const idTrabajo = Number(trabajo_social_id);
 
-    if (!trabajo_social_id) {
-      return res.status(400).json({ message: 'Falta el ID del trabajo social' });
+      if (!Number.isInteger(idTrabajo) || idTrabajo <= 0) {
+        return res.status(400).json({ message: 'ID de trabajo social inválido' });
+      }
+
+      const integrantes = await IntegranteGrupo.findAll({
+        where: { trabajo_social_id: idTrabajo },
+        attributes: [
+          'id_integrante',
+          'trabajo_social_id',
+          ['correo_institucional', 'correo'],
+          ['nombre_completo', 'nombre'],
+          'codigo',
+          'dni',
+          'facultad',
+          'programa_academico',
+          'estado'
+        ],
+        order: [['id_integrante', 'ASC']]
+      });
+
+      if (!integrantes.length) {
+        return res.status(404).json({ message: 'No hay integrantes registrados' });
+      }
+
+      return res.status(200).json(integrantes);
+    } catch (error) {
+      console.error('Error al obtener integrantes:', error);
+      return res.status(500).json({ message: 'Error del servidor' });
     }
-
-    const integrantes = await IntegranteGrupo.findAll({
-      where: { trabajo_social_id },
-      attributes: ['correo_institucional'], 
-    });
-
-    res.status(200).json(integrantes);
-  } catch (error) {
-    console.error('Error al obtener integrantes:', error);
-    res.status(500).json({ message: 'Error del servidor' });
   }
-});
+);
 
 
 router.get(
   '/estudiante/actual',
   authMiddleware,
-  verificarRol('alumno', 'docente supervisor', 'gestor-udh', 'programa-academico'),
+  verificarRol('alumno', 'docente supervisor', 'gestor-udh'),
   async (req, res) => {
     try {
       const { usuario_id } = req.query;
@@ -129,7 +146,16 @@ router.get(
 
       const integrantes = await IntegranteGrupo.findAll({
         where: { trabajo_social_id: trabajo.id },
-        attributes: ['correo_institucional'],
+        attributes: [
+          'id_integrante',
+          'nombre_completo',
+          'codigo',
+          'dni',
+          'facultad',
+          'programa_academico',
+          'correo_institucional',
+          'estado'
+        ],
       });
 
       return res.status(200).json({
@@ -142,75 +168,6 @@ router.get(
     } catch (error) {
       console.error('Error al obtener integrantes del estudiante:', error);
       return res.status(500).json({ message: 'Error del servidor' });
-    }
-  }
-);
-
-
-
-
-router.get('/:trabajo_social_id/enriquecido',
-  authMiddleware,
-  verificarRol('docente supervisor', 'gestor-udh', 'programa-academico'),
-  async (req, res) => {
-    try {
-      const { trabajo_social_id } = req.params;
-
-      const trabajo = await TrabajoSocialSeleccionado.findOne({
-        where: { id: trabajo_social_id }
-      });
-
-      if (!trabajo) {
-        return res.status(404).json({ message: 'Trabajo social no encontrado' });
-      }
-
-      if (trabajo.tipo_servicio_social === 'individual') {
-        const usuario = await Usuario.findOne({
-          where: { id: trabajo.usuario_id }
-        });
-
-        if (!usuario || !usuario.correo_institucional) {
-          return res.status(404).json({ message: 'Usuario no tiene correo institucional' });
-        }
-
-        const codigo = usuario.correo_institucional.split('@')[0];
-        const datos = await getDatosAcademicosUDH(codigo);
-
-        return res.json([{
-          usuario_id: usuario.id,
-          correo_institucional: usuario.correo_institucional,
-          codigo_universitario: codigo,
-          ...datos
-        }]);
-      }
-
-      const integrantes = await IntegranteGrupo.findAll({
-        where: { trabajo_social_id },
-        attributes: ['correo_institucional']
-      });
-
-      if (!integrantes.length) {
-        return res.status(404).json({ message: 'No hay integrantes registrados' });
-      }
-
-      const resultados = await Promise.all(
-        integrantes.map(async (i) => {
-          const correo = i.correo_institucional;
-          const codigo = correo.split('@')[0];
-          const datos = await getDatosAcademicosUDH(codigo);
-
-          return {
-            correo_institucional: correo,
-            codigo_universitario: codigo,
-            ...datos
-          };
-        })
-      );
-
-      res.json(resultados.filter(r => r !== null));
-    } catch (error) {
-      console.error('Error en enriquecido:', error);
-      res.status(500).json({ message: 'Error del servidor' });
     }
   }
 );

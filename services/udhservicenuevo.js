@@ -16,24 +16,33 @@ const getDatosAcademicosUDH = async (codigo) => {
     const apPat = (info.stu_apellido_paterno || '').trim();
     const apMat = (info.stu_apellido_materno || '').trim();
     const nombre_completo = `${nombres} ${apPat} ${apMat}`.trim() || null;
+
     const firstNonEmpty = (...vals) => {
       for (const v of vals) {
-        if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+        if (v !== undefined && v !== null && String(v).trim() !== '') {
+          return String(v).trim();
+        }
       }
       return null;
     };
+
+    const codigoFinal = firstNonEmpty(info.stu_codigo, info.codigo, codigo);
+
+    const emailApi = firstNonEmpty(
+      info.stu_correo_institucional,
+      info.stu_email,
+      info.email
+    );
+
+    const emailFinal = (emailApi || `${codigoFinal}@udh.edu.pe`).toLowerCase();
 
     return {
       nombre_completo,
       facultad: firstNonEmpty(info.stu_facultad, info.facultad),
       programa: firstNonEmpty(info.stu_programa, info.programa),
       dni: firstNonEmpty(info.stu_dni, info.dni),
-      codigo: firstNonEmpty(info.stu_codigo, info.codigo, codigo),
-      email: firstNonEmpty(
-        info.stu_correo_institucional,
-        info.stu_email,
-        info.email
-      ),
+      codigo: codigoFinal,
+      email: emailFinal,
 
       celular: firstNonEmpty(
         info.stu_celular,
