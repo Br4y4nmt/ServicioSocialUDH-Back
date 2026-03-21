@@ -7,7 +7,6 @@ const Facultades = require('../models/Facultades');
 const authMiddleware = require('../middlewares/authMiddleware');
 const verificarRol = require('../middlewares/verificarRol');
 const IntegranteGrupo = require('../models/IntegranteGrupo');
-const { getDatosAcademicosUDH } = require('../services/udhservicenuevo');
 
 
 router.get('/usuario/:id_usuario',

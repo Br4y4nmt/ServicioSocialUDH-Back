@@ -1,10 +1,11 @@
-require('dotenv').config(); 
+require('dotenv').config();
 
 const express = require('express');
 const helmet = require('helmet');
-const cors = require('cors');  
+const cors = require('cors');
 const path = require('path');
 const sequelize = require('./config/database');
+
 const Roles = require('./models/Roles');
 const Usuario = require('./models/Usuario');
 const Notificacion = require('./models/Notificacion');
@@ -21,17 +22,18 @@ const LaboresSociales = require('./models/LaboresSociales');
 const TrabajoSocialSeleccionado = require('./models/TrabajoSocialSeleccionado');
 const IntegranteGrupo = require('./models/IntegranteGrupo');
 const Facultades = require('./models/Facultades');
+const SystemConfig = require('./models/SystemConfig');
+
 const app = express();
 
 const corsOptions = {
-  origin: 'https://servicio-social.sistemasudh.com', 
-  //origin: 'http://localhost:3000', 
-  methods: ['GET', 'POST', 'PUT', 'DELETE','PATCH'],  
-  allowedHeaders: ['Content-Type', 'Authorization'],  
-  credentials: true,  
+  origin: 'https://serviciosocial.udh.edu.pe',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
 };
-app.use(cors(corsOptions));  
 
+app.use(cors(corsOptions));
 
 app.use(
   helmet({
@@ -40,83 +42,46 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-        'frame-ancestors': ["'self'", 'https://servicio-social.sistemasudh.com'], 
+        'frame-ancestors': ["'self'", 'https://serviciosocial.udh.edu.pe'],
       },
     },
   })
 );
+
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
-  setHeaders: (res) => {
-    res.set('Access-Control-Allow-Origin', '*'); 
-    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
-  }
-}));
 
-const authRoutes = require('./routes/auth');
-app.use('/api/auth', authRoutes);
+app.use(
+  '/uploads',
+  express.static(path.join(__dirname, 'uploads'), {
+    setHeaders: (res) => {
+      res.set('Access-Control-Allow-Origin', '*');
+      res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    },
+  })
+);
 
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/system-config', require('./routes/systemConfig'));
+app.use('/api/facultades', require('./routes/facultades'));
+app.use('/api/lineas', require('./routes/lineaDeAccion'));
+app.use('/api/programas', require('./routes/programas'));
+app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/docentes', require('./routes/docentes'));
+app.use('/api/usuarios', require('./routes/usuarios'));
+app.use('/api/certificados-final', require('./routes/certificadosFinalMiembros'));
+app.use('/api/admin', require('./routes/impersonate'));
+app.use('/api/cartas-aceptacion', require('./routes/cartasAceptacion'));
+app.use('/api/cartas-termino', require('./routes/cartasTermino'));
+app.use('/api/cronograma', require('./routes/cronograma'));
+app.use('/api/integrantes', require('./routes/integrantesGrupo'));
+app.use('/api/labores', require('./routes/laboresSociales'));
+app.use('/api/estudiantes', require('./routes/estudiantes'));
+app.use('/api/trabajo-social', require('./routes/trabajoSocialSeleccionadoRoutes'));
 
-const systemConfigRoutes  = require('./routes/systemConfig');
-app.use('/api/system-config', systemConfigRoutes);
-
-const facultadesRoutes = require('./routes/facultades');  
-app.use('/api/facultades', facultadesRoutes);
-
-const lineaDeAccionRoutes = require('./routes/lineaDeAccion');
-app.use('/api/lineas', lineaDeAccionRoutes);
-
-
-const programasRoutes = require('./routes/programas');
-app.use('/api/programas', programasRoutes);
-
-
-const dashboardRoutes = require('./routes/dashboard');
-app.use('/api/dashboard', dashboardRoutes);
-
-const docentesRoutes = require('./routes/docentes');
-app.use('/api/docentes', docentesRoutes);
-
-const usuariosRoutes = require('./routes/usuarios');
-app.use('/api/usuarios', usuariosRoutes);
-
-const certificadosFinalMiembrosRoutes = require('./routes/certificadosFinalMiembros');
-app.use('/api/certificados-final', certificadosFinalMiembrosRoutes);
-
-
-const impersonateRoutes = require('./routes/impersonate');
-app.use('/api/admin', impersonateRoutes);
-
-const cartasAceptacionRoutes = require('./routes/cartasAceptacion');
-app.use('/api/cartas-aceptacion', cartasAceptacionRoutes);
-
-
-const cartasTerminoRoutes = require('./routes/cartasTermino');
-app.use('/api/cartas-termino', cartasTerminoRoutes);
-
-
-const cronogramaRoutes = require('./routes/cronograma');
-app.use('/api/cronograma', cronogramaRoutes);
-
-const integrantesGrupoRoutes = require('./routes/integrantesGrupo');
-app.use('/api/integrantes', integrantesGrupoRoutes);
-
-
-const laboresSocialesRoutes = require('./routes/laboresSociales');
-app.use('/api/labores', laboresSocialesRoutes);
-
-
-const estudiantesRoutes = require('./routes/estudiantes');
-app.use('/api/estudiantes', estudiantesRoutes);
-
-
-const trabajoSocialSeleccionadoRoutes = require('./routes/trabajoSocialSeleccionadoRoutes');
-const SystemConfig = require('./models/SystemConfig');
-app.use('/api/trabajo-social', trabajoSocialSeleccionadoRoutes);
-
-
-const syncDatabase = async () => {
+const startServer = async () => {
   try {
+    await sequelize.authenticate();
+    console.log('Conexión a la base de datos exitosa');
 
     await Roles.sync();
     await TrabajoSocialSeleccionado.sync();
@@ -132,17 +97,16 @@ const syncDatabase = async () => {
     await CronogramaActividad.sync();
     await IntegranteGrupo.sync();
     await Estudiantes.sync();
+
     console.log('Base de datos sincronizada correctamente');
-    
- 
+
     const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`Servidor escuchando en el puerto ${PORT}`);
     });
-
   } catch (error) {
-    console.error('Error al sincronizar la base de datos:', error);
+    console.error('Error al iniciar el servidor:', error);
   }
 };
 
-syncDatabase();
+startServer();
