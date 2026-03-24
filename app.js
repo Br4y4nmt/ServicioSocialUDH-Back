@@ -27,6 +27,7 @@ const SystemConfig = require('./models/SystemConfig');
 const app = express();
 
 const corsOptions = {
+  //origin: 'http://localhost:3000',
   origin: 'https://serviciosocial.udh.edu.pe',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -43,6 +44,7 @@ app.use(
       directives: {
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
         'frame-ancestors': ["'self'", 'https://serviciosocial.udh.edu.pe'],
+        //'frame-ancestors': ["'self'", 'http://localhost:3000'],
       },
     },
   })
