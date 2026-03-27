@@ -42,7 +42,7 @@ const uploadCertificadoFinal = multer({
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/planes_labor_social'); 
+    cb(null, 'uploads/cartas_aceptacion'); 
   },
   filename: function (req, file, cb) {
     const uniqueName = Date.now() + '-' + file.originalname;
@@ -1422,7 +1422,7 @@ router.get('/documentos-trabajo/:id', async (req, res) => {
         return res.status(404).json({ message: 'Archivo no encontrado para este trabajo social' });
       }
 
-      rutaPDF = path.join(__dirname, '../uploads/planes_labor_social', trabajo.carta_aceptacion_pdf);
+      rutaPDF = path.join(__dirname, '../uploads/cartas_aceptacion', trabajo.carta_aceptacion_pdf);
     }
 
     if (!fs.existsSync(rutaPDF)) {
