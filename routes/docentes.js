@@ -8,6 +8,7 @@ const Docentes = require('../models/Docentes');
 const Facultades = require('../models/Facultades');
 const ProgramasAcademicos = require('../models/ProgramasAcademicos'); 
 const Usuario = require('../models/Usuario');
+const sequelize = require('../config/database');
 const authMiddleware = require('../middlewares/authMiddleware');
 const verificarRol = require('../middlewares/verificarRol');
 const TrabajoSocialSeleccionado = require("../models/TrabajoSocialSeleccionado");
@@ -108,6 +109,17 @@ router.put(
         return res.status(409).json({ message: 'Ya existe un docente con este DNI' });
       }
 
+      const otroUsuario = await Usuario.findOne({
+        where: {
+          dni,
+          id_usuario: { [Op.ne]: id_usuario }
+        }
+      });
+
+      if (otroUsuario) {
+        return res.status(409).json({ message: 'Ya existe un usuario con este DNI' });
+      }
+
       docente.nombre_docente = nombre_docente;
       docente.celular = celular;
       docente.dni = dni; 
@@ -119,9 +131,15 @@ router.put(
       await docente.save();
 
       const usuario = await Usuario.findByPk(id_usuario);
-      if (usuario && usuario.primera_vez === true) {
-        usuario.primera_vez = false;
-        await usuario.save({ fields: ['primera_vez'] });
+      if (usuario) {
+        usuario.dni = dni;
+        usuario.whatsapp = celular || '';
+
+        if (usuario.primera_vez === true) {
+          usuario.primera_vez = false;
+        }
+
+        await usuario.save({ fields: ['dni', 'whatsapp', 'primera_vez'] });
       }
 
       return res.status(200).json({ message: 'Docente actualizado correctamente' });
@@ -276,6 +294,103 @@ router.put('/:id_docente',
     } catch (error) {
       console.error('Error al actualizar docente y usuario:', error);
       res.status(500).json({ message: 'Error al actualizar docente y usuario', error });
+    }
+  }
+);
+
+
+router.put('/reiniciar-datos/:id_docente',
+  authMiddleware,
+  verificarRol('gestor-udh', 'programa-academico'),
+  async (req, res) => {
+    const transaction = await sequelize.transaction();
+
+    try {
+      const { id_docente } = req.params;
+      const { nombre_docente, email, facultad, programa_academico_id } = req.body;
+
+      const docente = await Docentes.findByPk(id_docente, { transaction });
+
+      if (!docente) {
+        await transaction.rollback();
+        return res.status(404).json({ message: 'Docente no encontrado' });
+      }
+
+      if (!email || !facultad || !programa_academico_id) {
+        await transaction.rollback();
+        return res.status(400).json({
+          message: 'Los campos email, facultad y programa_academico_id son obligatorios'
+        });
+      }
+
+      const usuarioExistente = await Usuario.findOne({
+        where: {
+          email,
+          id_usuario: { [Op.ne]: docente.id_usuario }
+        },
+        transaction
+      });
+
+      if (usuarioExistente) {
+        await transaction.rollback();
+        return res.status(409).json({ message: 'El correo ya está registrado por otro usuario.' });
+      }
+
+      const docenteConCorreo = await Docentes.findOne({
+        where: {
+          email,
+          id_docente: { [Op.ne]: id_docente }
+        },
+        transaction
+      });
+
+      if (docenteConCorreo) {
+        await transaction.rollback();
+        return res.status(409).json({ message: 'El correo ya está registrado por otro docente.' });
+      }
+
+      if (docente.firma_digital) {
+        const firmaPath = path.join(__dirname, '../uploads/firmas', docente.firma_digital);
+        if (fs.existsSync(firmaPath)) {
+          fs.unlinkSync(firmaPath);
+        }
+      }
+
+      await docente.update({
+        nombre_docente: nombre_docente ?? null,
+        email,
+        facultad_id: facultad,
+        programa_academico_id,
+        dni: null,
+        celular: '',
+        firma_digital: null
+      }, { transaction });
+
+      const usuario = await Usuario.findByPk(docente.id_usuario, { transaction });
+      if (!usuario) {
+        await transaction.rollback();
+        return res.status(404).json({ message: 'Usuario asociado no encontrado' });
+      }
+
+      await usuario.update({
+        email,
+        dni: null,
+        whatsapp: '',
+        primera_vez: true
+      }, { transaction });
+
+      await transaction.commit();
+
+      return res.status(200).json({
+        message: 'Docente y usuario actualizados correctamente con datos reiniciados.'
+      });
+    } catch (error) {
+      await transaction.rollback();
+      console.error('Error al reiniciar datos del docente y usuario:', error);
+      return res.status(500).json({
+        message: 'Error al reiniciar datos del docente y usuario',
+        error: error.message
+      });
     }
   }
 );

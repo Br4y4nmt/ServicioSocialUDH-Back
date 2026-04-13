@@ -1613,6 +1613,7 @@ router.post(
           .status(400)
           .json({ message: 'nuevo_estado debe ser "aceptado" o "rechazado"' });
       }
+
       const trabajo = await TrabajoSocialSeleccionado.findByPk(trabajo_id);
 
       if (!trabajo) {
@@ -1628,13 +1629,14 @@ router.post(
       }
 
       const estadoActual = trabajo.estado_plan_labor_social;
+
       if (estadoActual === nuevo_estado) {
         return res.status(400).json({
           message: `El trabajo ya está en estado "${estadoActual}".`
         });
       }
 
-      if (estadoActual === 'aceptado' && nuevo_estado === 'rechazado') {
+      if (nuevo_estado === 'rechazado' && ['pendiente', 'aceptado'].includes(estadoActual)) {
         if (trabajo.carta_aceptacion_pdf) {
           const rutaPDF = path.join(
             __dirname,
@@ -1658,15 +1660,11 @@ router.post(
           estado_plan_labor_social: 'rechazado',
           carta_aceptacion_pdf: null
         });
-      }
-
-      else if (estadoActual === 'rechazado' && nuevo_estado === 'aceptado') {
+      } else if (estadoActual === 'rechazado' && nuevo_estado === 'aceptado') {
         await trabajo.update({
           estado_plan_labor_social: 'aceptado'
         });
-      }
-
-      else {
+      } else {
         return res.status(400).json({
           message: `Transición de estado no permitida: ${estadoActual} → ${nuevo_estado}`
         });
@@ -1680,7 +1678,7 @@ router.post(
       await ObservacionTrabajoSocial.create({
         trabajo_id: trabajo.id,
         usuario_id: usuarioId,
-        tipo: 'cambio_estado', 
+        tipo: 'cambio_estado',
         observacion
       });
 
