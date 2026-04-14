@@ -24,12 +24,23 @@ router.post('/register', async (req, res) => {
     if (!codigo || !dni || !whatsapp) {
       return res.status(400).json({ message: 'Faltan datos requeridos' });
     }
+
     const config = await SystemConfig.findByPk(1);
 
     if (!config || Number(config.registro_habilitado) === 0) {
       console.log('REGISTRO BLOQUEADO POR CONFIG');
       return res.status(403).json({
         message: 'El registro de estudiantes está deshabilitado temporalmente'
+      });
+    }
+
+    // ✅ VALIDAR AÑO DEL CÓDIGO (>= 2021)
+    const codigoStr = String(codigo).trim();
+    const anio = parseInt(codigoStr.substring(0, 4));
+
+    if (isNaN(anio) || anio < 2021) {
+      return res.status(400).json({
+        message: 'El código debe ser 2021 en adelante'
       });
     }
 
@@ -43,9 +54,23 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'El DNI ingresado no coincide con el DNI del estudiante' });
     }
 
+    // ✅ VALIDAR CICLO (>= 8)
     const udhCiclo = data.ciclo || (data.raw && data.raw.stu_ciclo);
-    if (udhCiclo !== null && udhCiclo !== undefined && Number(udhCiclo) < 7) {
-      return res.status(400).json({ message: 'Solo pueden registrarse estudiantes del ciclo 7 o superior' });
+    if (udhCiclo !== null && udhCiclo !== undefined && Number(udhCiclo) < 8) {
+      return res.status(400).json({
+        message: 'Solo pueden registrarse estudiantes del ciclo 8 o superior'
+      });
+    }
+
+    // ✅ VALIDAR WHATSAPP ÚNICO
+    const existingWhatsapp = await Usuario.findOne({
+      where: { whatsapp: String(whatsapp).trim() }
+    });
+
+    if (existingWhatsapp) {
+      return res.status(409).json({
+        message: 'El número de WhatsApp ya está registrado'
+      });
     }
 
     const existingUser = await Usuario.findOne({ where: { email: `${codigo}@udh.edu.pe` } });
@@ -75,11 +100,12 @@ router.post('/register', async (req, res) => {
       email: `${codigo}@udh.edu.pe`,
       dni,
       whatsapp,
-      password: '', 
-      rol_id: 3 
+      password: '',
+      rol_id: 3
     });
 
     const nombreCompleto = data.nombre_completo || ((data.raw && `${data.raw.stu_nombres || ''} ${data.raw.stu_apellido_paterno || ''} ${data.raw.stu_apellido_materno || ''}`).trim());
+
     await Estudiantes.create({
       nombre_estudiante: nombreCompleto,
       dni,

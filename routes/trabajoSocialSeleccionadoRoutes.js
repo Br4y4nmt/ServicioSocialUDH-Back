@@ -457,7 +457,11 @@ router.post('/guardar-informe-final',
     if (!trabajo) {
       return res.status(404).json({ message: 'Trabajo social no encontrado' });
     }
-
+    if (!trabajo.carta_termino_pdf || trabajo.solicitud_termino !== 'aprobada') {
+      return res.status(400).json({
+        message: 'No puedes subir el informe final. Se requiere carta de término y solicitud aprobada.'
+      });
+    }
     await trabajo.update({ 
     informe_final_pdf: req.file.filename,
     estado_informe_final: 'pendiente' 
@@ -615,7 +619,41 @@ router.post(
             codigos_no_encontrados: noEncontrados
           });
         }
+        const erroresValidacion = resultados
+          .map(r => {
+            const codigo = String(r.datos.codigo || r.codigoSolicitado);
+            const anio = parseInt(codigo.substring(0, 4));
+            const ciclo = parseInt(r.datos.ciclo);
 
+            const errores = [];
+
+            if (isNaN(anio) || anio < 2021) {
+              errores.push('codigo_menor_2021');
+            }
+
+            if (isNaN(ciclo) || ciclo < 8) {
+              errores.push('ciclo_menor_8');
+            }
+
+            if (errores.length > 0) {
+              return {
+                codigo,
+                errores,
+                ciclo: r.datos.ciclo
+              };
+            }
+
+            return null;
+          })
+          .filter(Boolean);
+
+        if (erroresValidacion.length > 0) {
+          await t.rollback();
+          return res.status(400).json({
+            message: 'Algunos integrantes no cumplen con los requisitos (código menor a 2021 y ciclo menor a 8)',
+            detalles: erroresValidacion
+          });
+        }
         const sinCorreo = resultados
           .filter(r => !r.datos.email)
           .map(r => r.codigoSolicitado);
@@ -1004,6 +1042,9 @@ router.get(
     }
   });
 
+
+
+
 router.post('/generar-pdf/:id',
   authMiddleware,
   verificarRol('docente supervisor'),
@@ -1185,6 +1226,28 @@ router.post('/subir-plan-social',
     if (!trabajo) {
       return res.status(404).json({ message: 'No se encontró trabajo social con ese usuario_id' });
     }
+    if (!trabajo.carta_aceptacion_pdf || trabajo.estado_plan_labor_social !== 'aceptado') {
+    return res.status(400).json({
+      message: 'No puedes subir el plan social. Se requiere carta de aceptación y estado del plan aprobado.'
+    });
+    }
+    if (trabajo.archivo_plan_social) {
+      const rutaAnterior = path.join(
+        __dirname,
+        '..',
+        'uploads',
+        'planes_labor_social',
+        trabajo.archivo_plan_social
+      );
+
+      try {
+        if (fs.existsSync(rutaAnterior)) {
+          await fs.promises.unlink(rutaAnterior);
+        }
+      } catch (error) {
+        console.error('⚠️ Error al eliminar archivo anterior:', error);
+      }
+    }
 
     await trabajo.update({
       archivo_plan_social: archivo,
@@ -1212,7 +1275,11 @@ router.patch('/:id/solicitar-carta-termino',
     if (!trabajo) {
       return res.status(404).json({ message: 'Trabajo no encontrado' });
     }
-
+    if (trabajo.conformidad_plan_social !== 'aceptado') {
+      return res.status(400).json({
+        message: 'No puedes solicitar la carta de término. El plan social debe estar aprobado.'
+      });
+    }
     if (trabajo.solicitud_termino !== 'no_solicitada') {
       return res.status(400).json({ message: 'La solicitud ya fue enviada o está en revisión' });
     }
@@ -1649,10 +1716,10 @@ router.post(
           try {
             if (fs.existsSync(rutaPDF)) {
               await fs.promises.unlink(rutaPDF);
-              console.log('🗑️ Carta de aceptación eliminada:', rutaPDF);
+              console.log('Carta de aceptación eliminada:', rutaPDF);
             }
           } catch (err) {
-            console.error('⚠️ Error al eliminar carta_aceptacion_pdf:', err);
+            console.error('Error al eliminar carta_aceptacion_pdf:', err);
           }
         }
 
