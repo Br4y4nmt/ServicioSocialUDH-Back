@@ -542,29 +542,59 @@ router.get('/datos/usuario/:usuario_id',
 );
 
 
+
 router.put('/actualizar-celular/:id_usuario',
   authMiddleware,
   verificarRol('docente supervisor', 'gestor-udh', 'programa-academico'),
+  upload.single('firma_digital'),
   async (req, res) => {
-  try {
-    const { id_usuario } = req.params;
-    const { celular } = req.body;
+    try {
+      const { id_usuario } = req.params;
+      const { celular } = req.body;
 
-    const docente = await Docentes.findOne({ where: { id_usuario } });
+      // Validar que el celular no exista en otro docente
+      if (!celular || !/^\d{9}$/.test(celular)) {
+        return res.status(400).json({ message: 'Celular inválido. Debe tener exactamente 9 dígitos.' });
+      }
 
-    if (!docente) {
-      return res.status(404).json({ message: 'Docente no encontrado' });
+      const celularExistente = await Docentes.findOne({
+        where: {
+          celular,
+          id_usuario: { [Op.ne]: id_usuario }
+        }
+      });
+      if (celularExistente) {
+        return res.status(409).json({ message: 'Ya existe un docente con este número de celular.' });
+      }
+
+      const docente = await Docentes.findOne({ where: { id_usuario } });
+      if (!docente) {
+        return res.status(404).json({ message: 'Docente no encontrado' });
+      }
+
+      // Actualizar celular
+      docente.celular = celular;
+
+      // Si se sube una nueva firma, eliminar la anterior y guardar la nueva
+      if (req.file) {
+        if (docente.firma_digital) {
+          const firmaPath = path.join(__dirname, '../uploads/firmas', docente.firma_digital);
+          if (fs.existsSync(firmaPath)) {
+            fs.unlinkSync(firmaPath);
+          }
+        }
+        docente.firma_digital = req.file.filename;
+      }
+
+      await docente.save();
+
+      res.status(200).json({ message: 'Datos actualizados correctamente', docente });
+    } catch (error) {
+      console.error('Error al actualizar celular/firma del docente:', error);
+      res.status(500).json({ message: 'Error al actualizar celular/firma del docente', error });
     }
-
-    docente.celular = celular;
-    await docente.save();
-
-    res.status(200).json({ message: 'Celular actualizado correctamente', docente });
-  } catch (error) {
-    console.error('Error al actualizar celular del docente:', error);
-    res.status(500).json({ message: 'Error al actualizar celular del docente', error });
   }
-});
+);
 
 
 
