@@ -16,6 +16,7 @@ const Facultades = require('../models/Facultades');
 const ObservacionTrabajoSocial = require('../models/ObservacionTrabajoSocial');
 const LineaDeAccion = require('../models/LineaDeAccion'); 
 const Docentes = require('../models/Docentes');
+const CartaAceptacion = require('../models/CartaAceptacion');
 const { getDatosAcademicosUDH } = require('../services/udhservicenuevo');
 const { Op } = require('sequelize');
 
@@ -1705,21 +1706,21 @@ router.post(
 
       if (nuevo_estado === 'rechazado' && ['pendiente', 'aceptado'].includes(estadoActual)) {
         if (trabajo.carta_aceptacion_pdf) {
-          const rutaPDF = path.join(
-            __dirname,
-            '..',
-            'uploads',
-            'planes_labor_social',
-            trabajo.carta_aceptacion_pdf
-          );
+          const posiblesRutas = [
+            path.join(__dirname, '..', 'uploads', 'planes_labor_social', trabajo.carta_aceptacion_pdf),
+            path.join(__dirname, '..', 'uploads', 'cartas_aceptacion', trabajo.carta_aceptacion_pdf)
+          ];
 
-          try {
-            if (fs.existsSync(rutaPDF)) {
-              await fs.promises.unlink(rutaPDF);
-              console.log('Carta de aceptación eliminada:', rutaPDF);
+          for (const rutaPDF of posiblesRutas) {
+            try {
+              if (fs.existsSync(rutaPDF)) {
+                await fs.promises.unlink(rutaPDF);
+                console.log('Carta de aceptación eliminada:', rutaPDF);
+                break; // si se eliminó en una ruta, salir del bucle
+              }
+            } catch (err) {
+              console.error('Error al eliminar carta_aceptacion_pdf en', rutaPDF, err);
             }
-          } catch (err) {
-            console.error('Error al eliminar carta_aceptacion_pdf:', err);
           }
         }
 
@@ -1727,6 +1728,32 @@ router.post(
           estado_plan_labor_social: 'rechazado',
           carta_aceptacion_pdf: null
         });
+
+        // Si es trabajo grupal, eliminar las cartas de aceptación asociadas (archivos + registros)
+        try {
+          if (trabajo.tipo_servicio_social === 'grupal') {
+            const cartas = await CartaAceptacion.findAll({ where: { trabajo_id: trabajo.id } });
+            for (const carta of cartas) {
+              const nombreArchivo = carta.nombre_archivo_pdf;
+              const rutaCarta = path.join(__dirname, '..', 'uploads', 'cartas_aceptacion', nombreArchivo);
+              try {
+                if (fs.existsSync(rutaCarta)) {
+                  await fs.promises.unlink(rutaCarta);
+                  console.log('Carta de aceptación de integrante eliminada:', rutaCarta);
+                }
+              } catch (err) {
+                console.error('Error al eliminar archivo de carta de aceptación (integrante):', rutaCarta, err);
+              }
+            }
+
+            if (cartas.length > 0) {
+              await CartaAceptacion.destroy({ where: { trabajo_id: trabajo.id } });
+              console.log(`Registros de cartas_aceptacion para trabajo ${trabajo.id} eliminados de la BD.`);
+            }
+          }
+        } catch (err) {
+          console.error('Error al procesar cartas_aceptacion para trabajo grupal:', err);
+        }
       } else if (estadoActual === 'rechazado' && nuevo_estado === 'aceptado') {
         await trabajo.update({
           estado_plan_labor_social: 'aceptado'
