@@ -36,7 +36,18 @@ router.post('/register', async (req, res) => {
 
     // ✅ VALIDAR AÑO DEL CÓDIGO (>= 2021)
     const codigoStr = String(codigo).trim();
-    const anio = parseInt(codigoStr.substring(0, 4));
+    let anioStr;
+    // Códigos virtuales: empiezan con '1' y los siguientes 4 dígitos indican el año
+    if (codigoStr.startsWith('1') && codigoStr.length >= 5) {
+      anioStr = codigoStr.substring(1, 5);
+    } else if (codigoStr.length >= 4) {
+      // Códigos presenciales: los primeros 4 dígitos indican el año
+      anioStr = codigoStr.substring(0, 4);
+    } else {
+      return res.status(400).json({ message: 'Código inválido' });
+    }
+
+    const anio = parseInt(anioStr, 10);
 
     if (isNaN(anio) || anio < 2021) {
       return res.status(400).json({
