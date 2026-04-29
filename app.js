@@ -23,6 +23,7 @@ const TrabajoSocialSeleccionado = require('./models/TrabajoSocialSeleccionado');
 const IntegranteGrupo = require('./models/IntegranteGrupo');
 const Facultades = require('./models/Facultades');
 const SystemConfig = require('./models/SystemConfig');
+const Contactos = require('./models/Contactos');
 
 const app = express();
 
@@ -79,6 +80,7 @@ app.use('/api/integrantes', require('./routes/integrantesGrupo'));
 app.use('/api/labores', require('./routes/laboresSociales'));
 app.use('/api/estudiantes', require('./routes/estudiantes'));
 app.use('/api/trabajo-social', require('./routes/trabajoSocialSeleccionadoRoutes'));
+app.use('/api/contactos', require('./routes/contactos'));
 
 const startServer = async () => {
   try {
@@ -99,6 +101,7 @@ const startServer = async () => {
     await CronogramaActividad.sync();
     await IntegranteGrupo.sync();
     await Estudiantes.sync();
+    await Contactos.sync();
 
     console.log('Base de datos sincronizada correctamente');
 
