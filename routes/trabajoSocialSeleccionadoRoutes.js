@@ -546,10 +546,6 @@ router.post(
           });
         }
 
-        // Permite recibir:
-        // integrantes: ["2019110518", "2018112233"]
-        // o
-        // integrantes: [{ codigo: "2019110518" }, { codigo: "2018112233" }]
         const codigos = integrantes
           .map(item => {
             if (typeof item === 'string' || typeof item === 'number') {
@@ -620,10 +616,17 @@ router.post(
             codigos_no_encontrados: noEncontrados
           });
         }
+
         const erroresValidacion = resultados
           .map(r => {
             const codigo = String(r.datos.codigo || r.codigoSolicitado);
-            const anio = parseInt(codigo.substring(0, 4));
+
+            // ✅ FIX: detectar si es virtual (empieza con "1") o presencial
+            const esVirtual = codigo.startsWith('1');
+            const anio = esVirtual
+              ? parseInt(codigo.substring(1, 5))  // Virtual:     1[2021]XXXXXX
+              : parseInt(codigo.substring(0, 4)); // Presencial:  [2021]XXXXXX
+
             const ciclo = parseInt(r.datos.ciclo);
 
             const errores = [];
@@ -655,6 +658,7 @@ router.post(
             detalles: erroresValidacion
           });
         }
+
         const sinCorreo = resultados
           .filter(r => !r.datos.email)
           .map(r => r.codigoSolicitado);
@@ -703,7 +707,7 @@ router.post(
         }
 
         integrantesProcesados = resultados.map(r => ({
-          trabajo_social_id: null, // se asigna luego
+          trabajo_social_id: null,
           nombre_completo: r.datos.nombre_completo || '',
           dni: r.datos.dni || '',
           facultad: r.datos.facultad || '',
