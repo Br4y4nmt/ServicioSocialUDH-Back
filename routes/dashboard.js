@@ -77,7 +77,6 @@ router.get(
 
 router.get(
   "/total-trabajos-sociales-activos",
-  authMiddleware,
   verificarRol("gestor-udh"),
   async (req, res) => {
     try {
@@ -100,8 +99,6 @@ router.get(
 
 router.get(
   "/total-certificados-finales",
-  authMiddleware,
-  verificarRol("gestor-udh"),
   async (req, res) => {
     try {
       const trabajos = await TrabajoSocialSeleccionado.findAll({
@@ -307,8 +304,6 @@ router.get(
 
 router.get(
   "/estudiantes-por-programa",
-  authMiddleware,
-  verificarRol("gestor-udh"),
   async (req, res) => {
     try {
       const rows = await Estudiantes.findAll({
@@ -341,7 +336,6 @@ router.get(
     }
   }
 );
-
 
 
 router.get(
@@ -381,8 +375,6 @@ router.get(
   }
 );
 
-
-
 router.get(
   "/top-lineas-accion",
   authMiddleware,
@@ -421,4 +413,18 @@ router.get(
     }
   }
 );
+
+router.get(
+  "/total-lineas-accion",
+  async (req, res) => {
+    try {
+      const total = await LineaDeAccion.count();
+      res.json({ total });
+    } catch (error) {
+      console.error("Error total líneas de acción:", error);
+      res.status(500).json({ message: "Error al obtener total de líneas de acción" });
+    }
+  }
+);
+
 module.exports = router;
