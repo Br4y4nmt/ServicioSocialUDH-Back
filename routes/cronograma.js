@@ -133,6 +133,29 @@ router.post('/:usuario_id',
     const trabajo = await TrabajoSocialSeleccionado.findOne({ where: { usuario_id } });
     if (!trabajo) return res.status(404).json({ message: 'Trabajo no encontrado' });
 
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+
+    const esPasada = (value) => {
+      if (!value) return true;
+      const parts = String(value).split('-').map(Number);
+      if (parts.length !== 3 || parts.some(Number.isNaN)) return true;
+      const [year, month, day] = parts;
+      const date = new Date(year, month - 1, day);
+      date.setHours(0, 0, 0, 0);
+      return date < hoy;
+    };
+
+    const hayFechasPasadas = Array.isArray(actividades) && actividades.some(
+      (a) => esPasada(a?.fecha) || esPasada(a?.fechaFin)
+    );
+
+    if (hayFechasPasadas) {
+      return res.status(400).json({
+        message: 'Hay actividades con fechas anteriores a hoy.'
+      });
+    }
+
     await CronogramaActividad.destroy({ where: { trabajo_social_id: trabajo.id } });
 
     const nuevas = actividades.map((a) => ({
