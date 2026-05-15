@@ -77,7 +77,6 @@ router.get(
 
 router.get(
   "/total-trabajos-sociales-activos",
-  verificarRol("gestor-udh"),
   async (req, res) => {
     try {
       const total = await TrabajoSocialSeleccionado.count({
@@ -167,10 +166,8 @@ router.get(
   verificarRol("gestor-udh"),
   async (req, res) => {
     try {
-      // Total global
       const totalEstudiantes = await Estudiantes.count();
 
-      // Agrupar por sede
       const porSedeRaw = await Estudiantes.findAll({
         attributes: [
           "sede",
@@ -187,7 +184,6 @@ router.get(
           total: Number(r.total),
         }));
 
-      // Agrupar por modalidad
       const porModalidadRaw = await Estudiantes.findAll({
         attributes: [
           "modalidad",

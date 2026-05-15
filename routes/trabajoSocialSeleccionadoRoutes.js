@@ -981,15 +981,21 @@ router.get(
 
 
   // Ruta PUT para actualizar el estado del trabajo social
-  router.put('/:id',
+ router.put('/:id',
   authMiddleware,
   verificarRol('docente supervisor', 'gestor-udh'),
   async (req, res) => { 
     try {
       const { id } = req.params;
-      const { estado_plan_labor_social, conformidad_plan_social } = req.body;
+      const {
+        estado_plan_labor_social,
+        conformidad_plan_social,
+        observacion
+      } = req.body;
+
       const estadosValidos = ['pendiente', 'aceptado', 'rechazado'];
-      if (!estado_plan_labor_social && !conformidad_plan_social) {
+
+      if (!estado_plan_labor_social && !conformidad_plan_social && !observacion) {
         return res.status(400).json({ message: 'Debe proporcionar al menos un campo para actualizar.' });
       }
 
@@ -1027,14 +1033,23 @@ router.get(
         try {
           if (fs.existsSync(rutaArchivo)) {
             await fs.promises.unlink(rutaArchivo); 
-            console.log(`Archivo eliminado: ${rutaArchivo}`);
           }
           camposActualizar.archivo_plan_social = null; 
         } catch (error) {
           console.error('⚠️ Error al eliminar archivo del plan social:', error);
         }
       }
+
       await trabajoSocial.update(camposActualizar);
+
+      if (observacion && String(observacion).trim()) {
+        await ObservacionTrabajoSocial.create({
+          trabajo_id: trabajoSocial.id,
+          usuario_id: req.user?.id || null,
+          tipo: 'conformidad',
+          observacion: String(observacion).trim()
+        });
+      }
 
       res.status(200).json({
         message: 'Trabajo social actualizado correctamente.',
@@ -1046,7 +1061,6 @@ router.get(
       res.status(500).json({ message: 'Error interno al actualizar el trabajo social.', error });
     }
   });
-
 
 
 
@@ -1897,6 +1911,42 @@ router.get(
 );
 
 
+
+router.get(
+  '/observacion-conformidad/:id',
+  authMiddleware,
+  verificarRol('alumno'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const observacion = await ObservacionTrabajoSocial.findOne({
+        where: {
+          trabajo_id: id,
+          tipo: 'conformidad'
+        },
+        order: [['createdAt', 'DESC']]
+      });
+
+      if (!observacion) {
+        return res.status(404).json({
+          message: 'No se encontró observación de conformidad registrada.'
+        });
+      }
+
+      return res.json({
+        observacion: observacion.observacion,
+        fecha: observacion.createdAt
+      });
+    } catch (error) {
+      console.error('Error al obtener observación de conformidad:', error);
+      return res.status(500).json({
+        message: 'Error interno al obtener la observación de conformidad.',
+        error: error.message
+      });
+    }
+  }
+);
 
 router.get(
   '/motivo-rechazo/:trabajoId',
