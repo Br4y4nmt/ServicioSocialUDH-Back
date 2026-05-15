@@ -1,77 +1,37 @@
-const express = require('express');
-const authMiddleware = require('../middlewares/authMiddleware');
-const verificarRol = require('../middlewares/verificarRol');
-const router = express.Router();
-const multer = require('multer');
-const PDFDocument = require('pdfkit');
-const fs = require('fs');
-const path = require('path');
-const sequelize = require('../config/database');
-const { TrabajoSocialSeleccionado, IntegranteGrupo } = require('../models');
-const ProgramasAcademicos = require('../models/ProgramasAcademicos');
-const CronogramaActividades = require('../models/CronogramaActividad');
-const LaboresSociales = require('../models/LaboresSociales');
-const Estudiantes = require('../models/Estudiantes');
-const Facultades = require('../models/Facultades'); 
-const ObservacionTrabajoSocial = require('../models/ObservacionTrabajoSocial');
-const LineaDeAccion = require('../models/LineaDeAccion'); 
-const Docentes = require('../models/Docentes');
-const CartaAceptacion = require('../models/CartaAceptacion');
-const { getDatosAcademicosUDH } = require('../services/udhservicenuevo');
-const { Op } = require('sequelize');
+  const express = require('express');
+  const authMiddleware = require('../middlewares/authMiddleware');
+  const verificarRol = require('../middlewares/verificarRol');
+  const router = express.Router();
+  const multer = require('multer');
+  const PDFDocument = require('pdfkit');
+  const fs = require('fs');
+  const path = require('path');
+  const sequelize = require('../config/database');
+  const { TrabajoSocialSeleccionado, IntegranteGrupo } = require('../models');
+  const ProgramasAcademicos = require('../models/ProgramasAcademicos');
+  const CronogramaActividades = require('../models/CronogramaActividad');
+  const LaboresSociales = require('../models/LaboresSociales');
+  const Estudiantes = require('../models/Estudiantes');
+  const Facultades = require('../models/Facultades'); 
+  const ObservacionTrabajoSocial = require('../models/ObservacionTrabajoSocial');
+  const LineaDeAccion = require('../models/LineaDeAccion'); 
+  const Docentes = require('../models/Docentes');
+  const CartaAceptacion = require('../models/CartaAceptacion');
+  const { getDatosAcademicosUDH } = require('../services/udhservicenuevo');
+  const { Op } = require('sequelize');
 
-const storageCertificadoFinal = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/certificados_finales');
-  },
-  filename: function (req, file, cb) {
-    const uniqueName = `certificado_final_${Date.now()}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
-  }
-});
-
-const uploadCertificadoFinal = multer({
-  storage: storageCertificadoFinal,
-  fileFilter: function (req, file, cb) {
-    const ext = path.extname(file.originalname);
-    if (ext !== '.pdf') {
-      return cb(new Error('Solo se permiten archivos PDF'));
-    }
-    cb(null, true);
-  }
-});
-
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/cartas_aceptacion'); 
-  },
-  filename: function (req, file, cb) {
-    const uniqueName = Date.now() + '-' + file.originalname;
-    cb(null, uniqueName);
-  }
-});
-
-const upload = multer({
-  storage: storage,
-  fileFilter: function (req, file, cb) {
-    const ext = path.extname(file.originalname);
-    if (ext !== '.pdf') {
-      return cb(new Error('Solo se permiten archivos PDF'));
-    }
-    cb(null, true);
-  }
-});
-const storageArchivoPlan = multer.diskStorage({
+  const storageCertificadoFinal = multer.diskStorage({
     destination: function (req, file, cb) {
-      cb(null, 'uploads/planes_labor_social');
+      cb(null, 'uploads/certificados_finales');
     },
     filename: function (req, file, cb) {
-      const uniqueName = Date.now() + '-' + file.originalname;
+      const uniqueName = `certificado_final_${Date.now()}${path.extname(file.originalname)}`;
       cb(null, uniqueName);
     }
   });
-  const uploadArchivoPlan = multer({
-    storage: storageArchivoPlan,
+
+  const uploadCertificadoFinal = multer({
+    storage: storageCertificadoFinal,
     fileFilter: function (req, file, cb) {
       const ext = path.extname(file.originalname);
       if (ext !== '.pdf') {
@@ -80,880 +40,935 @@ const storageArchivoPlan = multer.diskStorage({
       cb(null, true);
     }
   });
-const storageCartaTermino = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const dir = path.join(__dirname, '../uploads/cartas_termino');
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true }); 
+
+  const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, 'uploads/cartas_aceptacion'); 
+    },
+    filename: function (req, file, cb) {
+      const uniqueName = Date.now() + '-' + file.originalname;
+      cb(null, uniqueName);
     }
-    cb(null, dir); 
-  },
-  filename: function (req, file, cb) {
-    const uniqueName = `carta_termino_${Date.now()}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
-  }
-});
+  });
 
-
-const storageInformeFinal = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/informes_finales'); 
-  },
-  filename: function (req, file, cb) {
-    const uniqueName = `informe_final_${Date.now()}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
-  }
-});
-
-const uploadInformeFinal = multer({
-  storage: storageInformeFinal,
-  fileFilter: function (req, file, cb) {
-    const ext = path.extname(file.originalname);
-    if (ext !== '.pdf') {
-      return cb(new Error('Solo se permiten archivos PDF'));
+  const upload = multer({
+    storage: storage,
+    fileFilter: function (req, file, cb) {
+      const ext = path.extname(file.originalname);
+      if (ext !== '.pdf') {
+        return cb(new Error('Solo se permiten archivos PDF'));
+      }
+      cb(null, true);
     }
-    cb(null, true);
-  }
-});
-
-const uploadCartaTermino = multer({
-  storage: storageCartaTermino,
-  fileFilter: function (req, file, cb) {
-    const ext = path.extname(file.originalname);
-    if (ext !== '.pdf') {
-      return cb(new Error('Solo se permiten archivos PDF'));
+  });
+  const storageArchivoPlan = multer.diskStorage({
+      destination: function (req, file, cb) {
+        cb(null, 'uploads/planes_labor_social');
+      },
+      filename: function (req, file, cb) {
+        const uniqueName = Date.now() + '-' + file.originalname;
+        cb(null, uniqueName);
+      }
+    });
+    const uploadArchivoPlan = multer({
+      storage: storageArchivoPlan,
+      fileFilter: function (req, file, cb) {
+        const ext = path.extname(file.originalname);
+        if (ext !== '.pdf') {
+          return cb(new Error('Solo se permiten archivos PDF'));
+        }
+        cb(null, true);
+      }
+    });
+  const storageCartaTermino = multer.diskStorage({
+    destination: function (req, file, cb) {
+      const dir = path.join(__dirname, '../uploads/cartas_termino');
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true }); 
+      }
+      cb(null, dir); 
+    },
+    filename: function (req, file, cb) {
+      const uniqueName = `carta_termino_${Date.now()}${path.extname(file.originalname)}`;
+      cb(null, uniqueName);
     }
-    cb(null, true);
-  }
-});
+  });
 
-router.get('/supervisores',
-  authMiddleware,
-  verificarRol('gestor-udh', 'docente supervisor', 'programa-academico'),
-  async (req, res) => {
-    try {
-      const rows = await TrabajoSocialSeleccionado.findAll({
-        include: [
-          { model: Estudiantes, attributes: ['nombre_estudiante'] },
-          { model: ProgramasAcademicos, attributes: ['nombre_programa'] },
-          { model: Docentes, attributes: ['nombre_docente'], as: 'Docente' }, 
-        ],
-        attributes: [
-          'id',
-          'estado_plan_labor_social',
-          'carta_aceptacion_pdf',
-          'usuario_id',
-          'programa_academico_id',
-          'docente_id'
-        ],
-        order: [['createdAt', 'DESC']]
-      });
 
-      const data = rows.map(r => {
-        const p = r.get({ plain: true });
-        return {
-          id: p.id,
-          estudiante: { nombre_estudiante: p.Estudiante?.nombre_estudiante || null },
-          programa:   { nombre_programa:   p.ProgramasAcademico?.nombre_programa || null },
-          estado: p.estado_plan_labor_social || 'pendiente',
-          carta_aceptacion_pdf: p.carta_aceptacion_pdf || null,
-          supervisor: { nombre_supervisor: p.Docente?.nombre_docente || null }
-        };
-      });
-
-      res.status(200).json(data);
-    } catch (error) {
-      console.error('Error al obtener supervisores:', error);
-      res.status(500).json({ message: 'Error al obtener supervisores', error });
+  const storageInformeFinal = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, 'uploads/informes_finales'); 
+    },
+    filename: function (req, file, cb) {
+      const uniqueName = `informe_final_${Date.now()}${path.extname(file.originalname)}`;
+      cb(null, uniqueName);
     }
-  }
-);
+  });
 
+  const uploadInformeFinal = multer({
+    storage: storageInformeFinal,
+    fileFilter: function (req, file, cb) {
+      const ext = path.extname(file.originalname);
+      if (ext !== '.pdf') {
+        return cb(new Error('Solo se permiten archivos PDF'));
+      }
+      cb(null, true);
+    }
+  });
 
+  const uploadCartaTermino = multer({
+    storage: storageCartaTermino,
+    fileFilter: function (req, file, cb) {
+      const ext = path.extname(file.originalname);
+      if (ext !== '.pdf') {
+        return cb(new Error('Solo se permiten archivos PDF'));
+      }
+      cb(null, true);
+    }
+  });
 
-router.get(
-  '/estudiantes-finalizados',
-  authMiddleware,
-  verificarRol('gestor-udh', 'programa-academico'),
-  async (req, res) => {
-    try {
-      const rows = await TrabajoSocialSeleccionado.findAll({
-        where: {
-          estado_informe_final: 'aprobado',
-          certificado_final: { [Op.ne]: null }
-        },
-        include: [
-          {
-            model: Estudiantes,
-            required: true,
-            attributes: [
-              'id_estudiante',
-              'id_usuario',
-              'nombre_estudiante',
-              'dni',
-              'email',
-              'codigo',
-              'celular',
-              'sede',
-              'modalidad',
-              'estado'
-            ],
-            include: [
-              {
-                model: ProgramasAcademicos,
-                as: 'programa',
-                attributes: ['id_programa', 'nombre_programa']
-              },
-              {
-                model: Facultades,
-                as: 'facultad',
-                attributes: ['id_facultad', 'nombre_facultad']
-              }
-            ]
-          }
-        ],
-        attributes: [
-          'id',
-          'usuario_id',
-          'estado_informe_final',
-          'certificado_final',
-          'informe_final_pdf',
-          'tipo_servicio_social',
-          'createdAt'
-        ],
-        order: [['createdAt', 'DESC']]
-      });
+  router.get('/supervisores',
+    authMiddleware,
+    verificarRol('gestor-udh', 'docente supervisor', 'programa-academico'),
+    async (req, res) => {
+      try {
+        const rows = await TrabajoSocialSeleccionado.findAll({
+          include: [
+            { model: Estudiantes, attributes: ['nombre_estudiante'] },
+            { model: ProgramasAcademicos, attributes: ['nombre_programa'] },
+            { model: Docentes, attributes: ['nombre_docente'], as: 'Docente' }, 
+          ],
+          attributes: [
+            'id',
+            'estado_plan_labor_social',
+            'carta_aceptacion_pdf',
+            'usuario_id',
+            'programa_academico_id',
+            'docente_id'
+          ],
+          order: [['createdAt', 'DESC']]
+        });
 
-      const data = await Promise.all(
-        rows.map(async (r) => {
+        const data = rows.map(r => {
           const p = r.get({ plain: true });
-
-          const trabajo = {
-            id: p.id,
-            usuario_id: p.usuario_id,
-            estado_informe_final: p.estado_informe_final,
-            certificado_final: p.certificado_final,
-            informe_final_pdf: p.informe_final_pdf,
-            tipo_servicio_social: p.tipo_servicio_social,
-            createdAt: p.createdAt
-          };
-
-          if ((p.tipo_servicio_social || '').toString().trim().toLowerCase() === 'grupal') {
-            const integrantesDB = await IntegranteGrupo.findAll({
-              where: { trabajo_social_id: p.id },
-              attributes: [
-                'id_integrante',
-                'trabajo_social_id',
-                'correo_institucional',
-                'codigo',
-                'nombre_completo',
-                'dni',
-                'facultad',
-                'programa_academico',
-                'estado',
-                'createdAt',
-                'updatedAt'
-              ],
-              order: [['id_integrante', 'ASC']]
-            });
-
-            trabajo.integrantes_grupo = integrantesDB.map((ig) => {
-              const plain = ig.get({ plain: true });
-              const correo = (plain.correo_institucional || '').trim();
-              const codigo = plain.codigo || (correo.includes('@') ? correo.split('@')[0] : null);
-
-              return {
-                id_estudiante: null,
-                id_usuario: null,
-                nombre_estudiante: plain.nombre_completo || null,
-                dni: plain.dni || null,
-                email: correo || null,
-                codigo: codigo || null,
-                celular: null, 
-                sede: null,    
-                modalidad: null, 
-                estado: plain.estado || 'NO_ATENDIDO',
-                programa: plain.programa_academico
-                  ? { id_programa: null, nombre_programa: plain.programa_academico }
-                  : null,
-                facultad: plain.facultad
-                  ? { id_facultad: null, nombre_facultad: plain.facultad }
-                  : null,
-                __integrante_grupo: {
-                  id_integrante: plain.id_integrante,
-                  trabajo_social_id: plain.trabajo_social_id,
-                  correo_institucional: correo,
-                  estado: plain.estado || 'NO_ATENDIDO'
-                }
-              };
-            });
-          }
-
           return {
-            estudiante: p.Estudiante,
-            trabajo
+            id: p.id,
+            estudiante: { nombre_estudiante: p.Estudiante?.nombre_estudiante || null },
+            programa:   { nombre_programa:   p.ProgramasAcademico?.nombre_programa || null },
+            estado: p.estado_plan_labor_social || 'pendiente',
+            carta_aceptacion_pdf: p.carta_aceptacion_pdf || null,
+            supervisor: { nombre_supervisor: p.Docente?.nombre_docente || null }
           };
-        })
-      );
+        });
+
+        res.status(200).json(data);
+      } catch (error) {
+        console.error('Error al obtener supervisores:', error);
+        res.status(500).json({ message: 'Error al obtener supervisores', error });
+      }
+    }
+  );
+
+router.patch(
+  '/:id/corregir-plan',
+  authMiddleware,
+  verificarRol('alumno'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const trabajo = await TrabajoSocialSeleccionado.findByPk(id);
+
+      if (!trabajo) {
+        return res.status(404).json({
+          message: 'Trabajo social no encontrado'
+        });
+      }
+
+      if (trabajo.conformidad_plan_social !== 'rechazado') {
+        return res.status(400).json({
+          message: 'El plan no está rechazado'
+        });
+      }
+
+      // Eliminar archivo físico si existe
+      if (trabajo.archivo_plan_social) {
+        const rutaArchivo = path.join(
+          __dirname,
+          '..',
+          'uploads',
+          'planes_labor_social',
+          trabajo.archivo_plan_social
+        );
+
+        try {
+          if (fs.existsSync(rutaArchivo)) {
+            await fs.promises.unlink(rutaArchivo);
+          }
+        } catch (err) {
+          console.error('Error al eliminar archivo_plan_social:', err);
+        }
+      }
+
+      await trabajo.update({
+        conformidad_plan_social: null,
+        archivo_plan_social: null
+      });
 
       return res.status(200).json({
-        total: data.length,
-        data,
-        meta: { udhDown: false } 
+        message: 'Estado restablecido correctamente'
       });
+
     } catch (error) {
-      console.error('Error en /estudiantes-finalizados:', error);
+      console.error('Error al corregir plan:', error);
+
       return res.status(500).json({
-        message: 'Error al obtener estudiantes finalizados',
+        message: 'Error interno del servidor',
         error: error.message
       });
     }
   }
 );
 
+  router.get(
+    '/estudiantes-finalizados',
+    authMiddleware,
+    verificarRol('gestor-udh', 'programa-academico'),
+    async (req, res) => {
+      try {
+        const rows = await TrabajoSocialSeleccionado.findAll({
+          where: {
+            estado_informe_final: 'aprobado',
+            certificado_final: { [Op.ne]: null }
+          },
+          include: [
+            {
+              model: Estudiantes,
+              required: true,
+              attributes: [
+                'id_estudiante',
+                'id_usuario',
+                'nombre_estudiante',
+                'dni',
+                'email',
+                'codigo',
+                'celular',
+                'sede',
+                'modalidad',
+                'estado'
+              ],
+              include: [
+                {
+                  model: ProgramasAcademicos,
+                  as: 'programa',
+                  attributes: ['id_programa', 'nombre_programa']
+                },
+                {
+                  model: Facultades,
+                  as: 'facultad',
+                  attributes: ['id_facultad', 'nombre_facultad']
+                }
+              ]
+            }
+          ],
+          attributes: [
+            'id',
+            'usuario_id',
+            'estado_informe_final',
+            'certificado_final',
+            'informe_final_pdf',
+            'tipo_servicio_social',
+            'createdAt'
+          ],
+          order: [['createdAt', 'DESC']]
+        });
 
-router.get('/informes-finales',
-  authMiddleware,
-  verificarRol('docente supervisor', 'gestor-udh'),
-  async (req, res) => {
+        const data = await Promise.all(
+          rows.map(async (r) => {
+            const p = r.get({ plain: true });
+
+            const trabajo = {
+              id: p.id,
+              usuario_id: p.usuario_id,
+              estado_informe_final: p.estado_informe_final,
+              certificado_final: p.certificado_final,
+              informe_final_pdf: p.informe_final_pdf,
+              tipo_servicio_social: p.tipo_servicio_social,
+              createdAt: p.createdAt
+            };
+
+            if ((p.tipo_servicio_social || '').toString().trim().toLowerCase() === 'grupal') {
+              const integrantesDB = await IntegranteGrupo.findAll({
+                where: { trabajo_social_id: p.id },
+                attributes: [
+                  'id_integrante',
+                  'trabajo_social_id',
+                  'correo_institucional',
+                  'codigo',
+                  'nombre_completo',
+                  'dni',
+                  'facultad',
+                  'programa_academico',
+                  'estado',
+                  'createdAt',
+                  'updatedAt'
+                ],
+                order: [['id_integrante', 'ASC']]
+              });
+
+              trabajo.integrantes_grupo = integrantesDB.map((ig) => {
+                const plain = ig.get({ plain: true });
+                const correo = (plain.correo_institucional || '').trim();
+                const codigo = plain.codigo || (correo.includes('@') ? correo.split('@')[0] : null);
+
+                return {
+                  id_estudiante: null,
+                  id_usuario: null,
+                  nombre_estudiante: plain.nombre_completo || null,
+                  dni: plain.dni || null,
+                  email: correo || null,
+                  codigo: codigo || null,
+                  celular: null, 
+                  sede: null,    
+                  modalidad: null, 
+                  estado: plain.estado || 'NO_ATENDIDO',
+                  programa: plain.programa_academico
+                    ? { id_programa: null, nombre_programa: plain.programa_academico }
+                    : null,
+                  facultad: plain.facultad
+                    ? { id_facultad: null, nombre_facultad: plain.facultad }
+                    : null,
+                  __integrante_grupo: {
+                    id_integrante: plain.id_integrante,
+                    trabajo_social_id: plain.trabajo_social_id,
+                    correo_institucional: correo,
+                    estado: plain.estado || 'NO_ATENDIDO'
+                  }
+                };
+              });
+            }
+
+            return {
+              estudiante: p.Estudiante,
+              trabajo
+            };
+          })
+        );
+
+        return res.status(200).json({
+          total: data.length,
+          data,
+          meta: { udhDown: false } 
+        });
+      } catch (error) {
+        console.error('Error en /estudiantes-finalizados:', error);
+        return res.status(500).json({
+          message: 'Error al obtener estudiantes finalizados',
+          error: error.message
+        });
+      }
+    }
+  );
+
+
+  router.get('/informes-finales',
+    authMiddleware,
+    verificarRol('docente supervisor', 'gestor-udh'),
+    async (req, res) => {
+      try {
+        const docente = await Docentes.findOne({
+          where: { id_usuario: req.user.id },
+          attributes: ['id_docente']
+        });
+
+        if (!docente) {
+          return res.status(404).json({ message: 'Docente no encontrado para el usuario logueado' });
+        }
+
+        const informes = await TrabajoSocialSeleccionado.findAll({
+          where: {
+            docente_id: docente.id_docente,
+            informe_final_pdf: { [Op.ne]: null },
+            estado_informe_final: { [Op.in]: ['pendiente', 'aprobado'] },
+            carta_termino_pdf: { [Op.ne]: null }
+          },
+          include: [
+            {
+              model: Estudiantes,
+              attributes: ['nombre_estudiante']
+            },
+            {
+              model: ProgramasAcademicos,
+              attributes: ['nombre_programa']
+            },
+            {
+              model: Facultades,
+              as: 'Facultad',
+              attributes: ['nombre_facultad']
+            }
+          ],
+          attributes: [
+            'id',
+            'informe_final_pdf',
+            'archivo_plan_social',
+            'estado_informe_final',
+            'createdAt',
+            'certificado_final',
+            'tipo_servicio_social',
+            'usuario_id'            
+          ]
+        });
+
+        res.status(200).json(informes);
+      } catch (error) {
+        console.error('Error al obtener informes finales:', error);
+        res.status(500).json({ message: 'Error interno al obtener informes finales', error });
+      }
+    });
+    
+
+  router.get(
+    '/informes-finales-nuevo',
+    authMiddleware,
+    verificarRol('gestor-udh'),
+    async (req, res) => {
+      try {
+        const { Op } = require('sequelize');
+
+        const informes = await TrabajoSocialSeleccionado.findAll({
+          where: {
+            informe_final_pdf: { [Op.ne]: null },
+            estado_informe_final: 'aprobado'
+          },
+          include: [
+            {
+              model: Estudiantes,
+              attributes: ['nombre_estudiante']
+            },
+            {
+              model: ProgramasAcademicos,
+              attributes: ['nombre_programa']
+            },
+            {
+              model: Facultades,
+              as: 'Facultad',
+              attributes: ['nombre_facultad']
+            }
+          ],
+          attributes: [
+            'id',
+            'informe_final_pdf',
+            'archivo_plan_social',
+            'estado_informe_final',
+            'createdAt',
+            'certificado_final',
+            'tipo_servicio_social',
+            'usuario_id'
+          ],
+          order: [['createdAt', 'DESC']]
+        });
+
+        res.status(200).json(informes);
+      } catch (error) {
+        console.error('Error al obtener informes finales aprobados:', error);
+        res.status(500).json({
+          message: 'Error interno al obtener informes finales aprobados',
+          error
+        });
+      }
+    }
+  );
+    
+  router.delete('/seleccionado/:id', authMiddleware, async (req, res) => {
+    const { id } = req.params;
+
     try {
-      const docente = await Docentes.findOne({
-        where: { id_usuario: req.user.id },
-        attributes: ['id_docente']
-      });
+      const trabajo = await TrabajoSocialSeleccionado.findByPk(id);
 
-      if (!docente) {
-        return res.status(404).json({ message: 'Docente no encontrado para el usuario logueado' });
+      if (!trabajo) {
+        return res.status(404).json({ message: 'No se encontró la elección del trabajo social' });
       }
 
-      const informes = await TrabajoSocialSeleccionado.findAll({
-        where: {
-          docente_id: docente.id_docente,
-          informe_final_pdf: { [Op.ne]: null },
-          estado_informe_final: { [Op.in]: ['pendiente', 'aprobado'] },
-          carta_termino_pdf: { [Op.ne]: null }
-        },
-        include: [
-          {
-            model: Estudiantes,
-            attributes: ['nombre_estudiante']
-          },
-          {
-            model: ProgramasAcademicos,
-            attributes: ['nombre_programa']
-          },
-          {
-            model: Facultades,
-            as: 'Facultad',
-            attributes: ['nombre_facultad']
+      await trabajo.destroy();
+
+      res.status(200).json({ message: 'Elección eliminada correctamente' });
+    } catch (error) {
+      console.error('Error al eliminar elección:', error);
+      res.status(500).json({ message: 'Error al eliminar la elección' });
+    }
+  });
+
+
+  // 📩 Ruta para guardar el informe final generado desde el frontend
+  router.post('/guardar-informe-final',
+    authMiddleware,
+    verificarRol('alumno'),
+    uploadInformeFinal.single('archivo'),
+    async (req, res) => {
+    try {
+      const { trabajo_id } = req.body;
+
+      if (!trabajo_id || !req.file) {
+        return res.status(400).json({ message: 'Faltan datos obligatorios' });
+      }
+
+      const trabajo = await TrabajoSocialSeleccionado.findByPk(trabajo_id);
+
+      if (!trabajo) {
+        return res.status(404).json({ message: 'Trabajo social no encontrado' });
+      }
+      if (!trabajo.carta_termino_pdf || trabajo.solicitud_termino !== 'aprobada') {
+        return res.status(400).json({
+          message: 'No puedes subir el informe final. Se requiere carta de término y solicitud aprobada.'
+        });
+      }
+      await trabajo.update({ 
+      informe_final_pdf: req.file.filename,
+      estado_informe_final: 'pendiente' 
+    });
+
+      res.status(200).json({ message: 'Informe final guardado correctamente', archivo: req.file.filename });
+    } catch (error) {
+      console.error('Error al guardar el informe final:', error);
+      res.status(500).json({ message: 'Error interno al guardar informe final', error });
+    }
+  });
+
+  router.post(
+    '/',
+    authMiddleware,
+    verificarRol('alumno'),
+    async (req, res) => {
+      const t = await sequelize.transaction();
+
+      try {
+        const {
+          usuario_id,
+          programa_academico_id,
+          docente_id,
+          labor_social_id,
+          facultad_id,
+          tipo_servicio_social,
+          linea_accion_id,
+          integrantes
+        } = req.body;
+
+        if (!usuario_id || isNaN(usuario_id)) {
+          await t.rollback();
+          return res.status(400).json({ message: 'usuario_id inválido' });
+        }
+
+        if (!facultad_id || isNaN(facultad_id)) {
+          await t.rollback();
+          return res.status(400).json({ message: 'facultad_id inválido' });
+        }
+
+        if (!programa_academico_id || isNaN(programa_academico_id)) {
+          await t.rollback();
+          return res.status(400).json({ message: 'programa_academico_id inválido' });
+        }
+
+        if (!docente_id || isNaN(docente_id)) {
+          await t.rollback();
+          return res.status(400).json({ message: 'docente_id inválido' });
+        }
+
+        if (!labor_social_id || isNaN(labor_social_id)) {
+          await t.rollback();
+          return res.status(400).json({ message: 'labor_social_id inválido' });
+        }
+
+        if (!linea_accion_id || isNaN(linea_accion_id)) {
+          await t.rollback();
+          return res.status(400).json({ message: 'linea_accion_id inválido' });
+        }
+
+        if (!['individual', 'grupal'].includes(tipo_servicio_social)) {
+          await t.rollback();
+          return res.status(400).json({ message: 'tipo_servicio_social inválido' });
+        }
+
+        let integrantesProcesados = [];
+
+        if (tipo_servicio_social === 'grupal') {
+          if (!Array.isArray(integrantes)) {
+            await t.rollback();
+            return res.status(400).json({
+              message: 'Debes enviar un arreglo de integrantes'
+            });
           }
-        ],
+
+          if (integrantes.length === 0) {
+            await t.rollback();
+            return res.status(400).json({
+              message: 'Debes enviar al menos un integrante'
+            });
+          }
+
+          const codigos = integrantes
+            .map(item => {
+              if (typeof item === 'string' || typeof item === 'number') {
+                return String(item).trim();
+              }
+              if (item && item.codigo) {
+                return String(item.codigo).trim();
+              }
+              return '';
+            })
+            .filter(Boolean);
+
+          if (codigos.length === 0) {
+            await t.rollback();
+            return res.status(400).json({
+              message: 'No se enviaron códigos válidos'
+            });
+          }
+
+          const codigoPropioEnIntegrantes = await Estudiantes.findOne({
+            where: {
+              id_usuario: parseInt(usuario_id),
+              codigo: { [Op.in]: codigos }
+            },
+            attributes: ['codigo'],
+            transaction: t
+          });
+
+          if (codigoPropioEnIntegrantes) {
+            await t.rollback();
+            return res.status(409).json({
+              message: 'No puedes agregarte a ti mismo como integrante del grupo',
+              codigo_conflictivo: codigoPropioEnIntegrantes.codigo
+            });
+          }
+
+          const seen = new Set();
+          const duplicados = new Set();
+
+          for (const codigo of codigos) {
+            if (seen.has(codigo)) duplicados.add(codigo);
+            else seen.add(codigo);
+          }
+
+          if (duplicados.size > 0) {
+            await t.rollback();
+            return res.status(409).json({
+              message: 'Hay códigos repetidos en el envío',
+              duplicados: [...duplicados]
+            });
+          }
+
+          const resultados = await Promise.all(
+            codigos.map(async (codigo) => {
+              const datos = await getDatosAcademicosUDH(codigo);
+              return { codigoSolicitado: codigo, datos };
+            })
+          );
+
+          const noEncontrados = resultados
+            .filter(r => !r.datos)
+            .map(r => r.codigoSolicitado);
+
+          if (noEncontrados.length > 0) {
+            await t.rollback();
+            return res.status(404).json({
+              message: 'No se encontraron datos académicos para algunos códigos',
+              codigos_no_encontrados: noEncontrados
+            });
+          }
+
+          const erroresValidacion = resultados
+            .map(r => {
+              const codigo = String(r.datos.codigo || r.codigoSolicitado);
+
+              // ✅ FIX: detectar si es virtual (empieza con "1") o presencial
+              const esVirtual = codigo.startsWith('1');
+              const anio = esVirtual
+                ? parseInt(codigo.substring(1, 5))  // Virtual:     1[2021]XXXXXX
+                : parseInt(codigo.substring(0, 4)); // Presencial:  [2021]XXXXXX
+
+              const ciclo = parseInt(r.datos.ciclo);
+
+              const errores = [];
+
+              if (isNaN(anio) || anio < 2021) {
+                errores.push('codigo_menor_2021');
+              }
+
+              if (isNaN(ciclo) || ciclo < 8) {
+                errores.push('ciclo_menor_8');
+              }
+
+              if (errores.length > 0) {
+                return {
+                  codigo,
+                  errores,
+                  ciclo: r.datos.ciclo
+                };
+              }
+
+              return null;
+            })
+            .filter(Boolean);
+
+          if (erroresValidacion.length > 0) {
+            await t.rollback();
+            return res.status(400).json({
+              message: 'Algunos integrantes no cumplen con los requisitos (código menor a 2021 y ciclo menor a 8)',
+              detalles: erroresValidacion
+            });
+          }
+
+          const sinCorreo = resultados
+            .filter(r => !r.datos.email)
+            .map(r => r.codigoSolicitado);
+
+          if (sinCorreo.length > 0) {
+            await t.rollback();
+            return res.status(400).json({
+              message: 'Algunos estudiantes no tienen correo institucional en la consulta externa',
+              codigos_sin_correo: sinCorreo
+            });
+          }
+
+          const correosInvalidos = resultados
+            .filter(r => !String(r.datos.email).toLowerCase().endsWith('@udh.edu.pe'))
+            .map(r => ({
+              codigo: r.codigoSolicitado,
+              correo: r.datos.email
+            }));
+
+          if (correosInvalidos.length > 0) {
+            await t.rollback();
+            return res.status(400).json({
+              message: 'Algunos correos recuperados no tienen dominio @udh.edu.pe',
+              correos_invalidos: correosInvalidos
+            });
+          }
+
+          const correosSet = new Set();
+          const correosDuplicados = new Set();
+
+          for (const r of resultados) {
+            const correo = String(r.datos.email).trim().toLowerCase();
+            if (correosSet.has(correo)) {
+              correosDuplicados.add(correo);
+            } else {
+              correosSet.add(correo);
+            }
+          }
+
+          if (correosDuplicados.size > 0) {
+            await t.rollback();
+            return res.status(409).json({
+              message: 'La consulta devolvió correos institucionales repetidos',
+              correos_duplicados: [...correosDuplicados]
+            });
+          }
+
+          integrantesProcesados = resultados.map(r => ({
+            trabajo_social_id: null,
+            nombre_completo: r.datos.nombre_completo || '',
+            dni: r.datos.dni || '',
+            facultad: r.datos.facultad || '',
+            programa_academico: r.datos.programa || '',
+            codigo: r.datos.codigo || r.codigoSolicitado,
+            correo_institucional: String(r.datos.email).trim().toLowerCase(),
+            estado: 'NO_ATENDIDO'
+          }));
+
+          const incompletos = integrantesProcesados.filter(i =>
+            !i.nombre_completo ||
+            !i.dni ||
+            !i.facultad ||
+            !i.programa_academico ||
+            !i.codigo ||
+            !i.correo_institucional
+          );
+
+          if (incompletos.length > 0) {
+            await t.rollback();
+            return res.status(400).json({
+              message: 'Algunos integrantes tienen datos incompletos desde la API externa',
+              integrantes_incompletos: incompletos.map(i => ({
+                codigo: i.codigo,
+                nombre_completo: i.nombre_completo,
+                dni: i.dni,
+                facultad: i.facultad,
+                programa_academico: i.programa_academico,
+                correo_institucional: i.correo_institucional
+              }))
+            });
+          }
+
+          const codigosIntegrantes = integrantesProcesados
+            .map(i => String(i.codigo).trim())
+            .filter(Boolean);
+
+          const correosIntegrantes = integrantesProcesados
+            .map(i => String(i.correo_institucional).trim().toLowerCase())
+            .filter(Boolean);
+
+          const integrantesYaRegistrados = await IntegranteGrupo.findAll({
+            where: {
+              [Op.or]: [
+                { codigo: { [Op.in]: codigosIntegrantes } },
+                { correo_institucional: { [Op.in]: correosIntegrantes } }
+              ]
+            },
+            attributes: ['trabajo_social_id', 'codigo', 'correo_institucional'],
+            transaction: t
+          });
+
+          if (integrantesYaRegistrados.length > 0) {
+            const conflictosCodigo = [
+              ...new Set(
+                integrantesYaRegistrados
+                  .map(i => i.codigo)
+                  .filter(Boolean)
+              )
+            ];
+
+            const conflictosCorreo = [
+              ...new Set(
+                integrantesYaRegistrados
+                  .map(i => String(i.correo_institucional || '').trim().toLowerCase())
+                  .filter(Boolean)
+              )
+            ];
+
+            const trabajosRelacionados = [
+              ...new Set(
+                integrantesYaRegistrados
+                  .map(i => i.trabajo_social_id)
+                  .filter(Boolean)
+              )
+            ];
+
+            await t.rollback();
+            return res.status(409).json({
+              message: 'Algunos integrantes ya pertenecen a otro trabajo social',
+              codigos_conflictivos: conflictosCodigo,
+              correos_conflictivos: conflictosCorreo,
+              trabajos_sociales_relacionados: trabajosRelacionados
+            });
+          }
+        }
+
+        const nuevoRegistro = await TrabajoSocialSeleccionado.create(
+          {
+            usuario_id: parseInt(usuario_id),
+            programa_academico_id: parseInt(programa_academico_id),
+            docente_id: parseInt(docente_id),
+            labor_social_id: parseInt(labor_social_id),
+            facultad_id: parseInt(facultad_id),
+            tipo_servicio_social,
+            linea_accion_id: parseInt(linea_accion_id)
+          },
+          { transaction: t }
+        );
+
+        if (tipo_servicio_social === 'grupal') {
+          const integrantesFinal = integrantesProcesados.map(i => ({
+            ...i,
+            trabajo_social_id: nuevoRegistro.id
+          }));
+
+          await IntegranteGrupo.bulkCreate(integrantesFinal, {
+            validate: true,
+            transaction: t
+          });
+        }
+
+        await t.commit();
+
+        return res.status(201).json({
+          message: 'Trabajo social creado correctamente',
+          id: nuevoRegistro.id,
+          total_integrantes: tipo_servicio_social === 'grupal' ? integrantesProcesados.length : 0
+        });
+
+      } catch (error) {
+        await t.rollback();
+        console.error('❌ Error al guardar selección con rollback:', error);
+
+        return res.status(500).json({
+          message: 'Error al guardar selección',
+          error: error.message
+        });
+      }
+    }
+  );
+
+
+  // Ruta para obtener el estado del trabajo social por usuario_id
+  router.get('/usuario/:usuario_id',
+    authMiddleware,
+    verificarRol('alumno', 'docente supervisor', 'gestor-udh'),
+    async (req, res) => {
+    try {
+      const usuario_id = req.params.usuario_id;
+
+      const trabajoSocial = await TrabajoSocialSeleccionado.findOne({
+        where: { usuario_id },
         attributes: [
           'id',
-          'informe_final_pdf',
+          'usuario_id',
+          'programa_academico_id',
+          'docente_id',
+          'labor_social_id',
+          'estado_plan_labor_social',
+          'facultad_id',
+          'linea_accion_id',
+          'conformidad_plan_social',
           'archivo_plan_social',
-          'estado_informe_final',
-          'createdAt',
-          'certificado_final',
           'tipo_servicio_social',
-          'usuario_id'            
+          'solicitud_termino',
+          'carta_aceptacion_pdf',
+          'informe_final_pdf',
+          'carta_termino_pdf',
+          'estado_informe_final',
+          'certificado_final' 
+        ],
+        include: [
+          {
+            model: LineaDeAccion,
+            as: 'lineaAccion', 
+            attributes: ['nombre_linea'] 
+          }
         ]
       });
 
-      res.status(200).json(informes);
+    if (trabajoSocial) {
+        const plain = trabajoSocial.get({ plain: true });
+        plain.linea_accion = plain.lineaAccion ? plain.lineaAccion.nombre_linea : '';
+        delete plain.lineaAccion; 
+        res.status(200).json(plain);
+      } else {
+        res.status(200).json(null);
+      }
     } catch (error) {
-      console.error('Error al obtener informes finales:', error);
-      res.status(500).json({ message: 'Error interno al obtener informes finales', error });
+      console.error('Error al obtener estado del trabajo social:', error);
+      res.status(500).json({ error: 'Error interno del servidor' });
     }
   });
-  
 
-router.get(
-  '/informes-finales-nuevo',
-  authMiddleware,
-  verificarRol('gestor-udh'),
-  async (req, res) => {
-    try {
-      const { Op } = require('sequelize');
 
-      const informes = await TrabajoSocialSeleccionado.findAll({
-        where: {
-          informe_final_pdf: { [Op.ne]: null },
-          estado_informe_final: 'aprobado'
-        },
-        include: [
-          {
-            model: Estudiantes,
-            attributes: ['nombre_estudiante']
-          },
-          {
-            model: ProgramasAcademicos,
-            attributes: ['nombre_programa']
-          },
-          {
-            model: Facultades,
-            as: 'Facultad',
-            attributes: ['nombre_facultad']
-          }
-        ],
-        attributes: [
-          'id',
-          'informe_final_pdf',
-          'archivo_plan_social',
-          'estado_informe_final',
-          'createdAt',
-          'certificado_final',
-          'tipo_servicio_social',
-          'usuario_id'
-        ],
-        order: [['createdAt', 'DESC']]
-      });
 
-      res.status(200).json(informes);
-    } catch (error) {
-      console.error('Error al obtener informes finales aprobados:', error);
-      res.status(500).json({
-        message: 'Error interno al obtener informes finales aprobados',
-        error
-      });
-    }
-  }
-);
-  
-router.delete('/seleccionado/:id', authMiddleware, async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const trabajo = await TrabajoSocialSeleccionado.findByPk(id);
-
-    if (!trabajo) {
-      return res.status(404).json({ message: 'No se encontró la elección del trabajo social' });
-    }
-
-    await trabajo.destroy();
-
-    res.status(200).json({ message: 'Elección eliminada correctamente' });
-  } catch (error) {
-    console.error('Error al eliminar elección:', error);
-    res.status(500).json({ message: 'Error al eliminar la elección' });
-  }
-});
-
-
-// 📩 Ruta para guardar el informe final generado desde el frontend
-router.post('/guardar-informe-final',
-  authMiddleware,
-  verificarRol('alumno'),
-  uploadInformeFinal.single('archivo'),
-  async (req, res) => {
-  try {
-    const { trabajo_id } = req.body;
-
-    if (!trabajo_id || !req.file) {
-      return res.status(400).json({ message: 'Faltan datos obligatorios' });
-    }
-
-    const trabajo = await TrabajoSocialSeleccionado.findByPk(trabajo_id);
-
-    if (!trabajo) {
-      return res.status(404).json({ message: 'Trabajo social no encontrado' });
-    }
-    if (!trabajo.carta_termino_pdf || trabajo.solicitud_termino !== 'aprobada') {
-      return res.status(400).json({
-        message: 'No puedes subir el informe final. Se requiere carta de término y solicitud aprobada.'
-      });
-    }
-    await trabajo.update({ 
-    informe_final_pdf: req.file.filename,
-    estado_informe_final: 'pendiente' 
-  });
-
-    res.status(200).json({ message: 'Informe final guardado correctamente', archivo: req.file.filename });
-  } catch (error) {
-    console.error('Error al guardar el informe final:', error);
-    res.status(500).json({ message: 'Error interno al guardar informe final', error });
-  }
-});
-
-router.post(
-  '/',
-  authMiddleware,
-  verificarRol('alumno'),
-  async (req, res) => {
-    const t = await sequelize.transaction();
-
-    try {
-      const {
-        usuario_id,
-        programa_academico_id,
-        docente_id,
-        labor_social_id,
-        facultad_id,
-        tipo_servicio_social,
-        linea_accion_id,
-        integrantes
-      } = req.body;
-
-      if (!usuario_id || isNaN(usuario_id)) {
-        await t.rollback();
-        return res.status(400).json({ message: 'usuario_id inválido' });
-      }
-
-      if (!facultad_id || isNaN(facultad_id)) {
-        await t.rollback();
-        return res.status(400).json({ message: 'facultad_id inválido' });
-      }
-
-      if (!programa_academico_id || isNaN(programa_academico_id)) {
-        await t.rollback();
-        return res.status(400).json({ message: 'programa_academico_id inválido' });
-      }
-
-      if (!docente_id || isNaN(docente_id)) {
-        await t.rollback();
-        return res.status(400).json({ message: 'docente_id inválido' });
-      }
-
-      if (!labor_social_id || isNaN(labor_social_id)) {
-        await t.rollback();
-        return res.status(400).json({ message: 'labor_social_id inválido' });
-      }
-
-      if (!linea_accion_id || isNaN(linea_accion_id)) {
-        await t.rollback();
-        return res.status(400).json({ message: 'linea_accion_id inválido' });
-      }
-
-      if (!['individual', 'grupal'].includes(tipo_servicio_social)) {
-        await t.rollback();
-        return res.status(400).json({ message: 'tipo_servicio_social inválido' });
-      }
-
-      let integrantesProcesados = [];
-
-      if (tipo_servicio_social === 'grupal') {
-        if (!Array.isArray(integrantes)) {
-          await t.rollback();
-          return res.status(400).json({
-            message: 'Debes enviar un arreglo de integrantes'
-          });
-        }
-
-        if (integrantes.length === 0) {
-          await t.rollback();
-          return res.status(400).json({
-            message: 'Debes enviar al menos un integrante'
-          });
-        }
-
-        const codigos = integrantes
-          .map(item => {
-            if (typeof item === 'string' || typeof item === 'number') {
-              return String(item).trim();
-            }
-            if (item && item.codigo) {
-              return String(item.codigo).trim();
-            }
-            return '';
-          })
-          .filter(Boolean);
-
-        if (codigos.length === 0) {
-          await t.rollback();
-          return res.status(400).json({
-            message: 'No se enviaron códigos válidos'
-          });
-        }
-
-        const codigoPropioEnIntegrantes = await Estudiantes.findOne({
-          where: {
-            id_usuario: parseInt(usuario_id),
-            codigo: { [Op.in]: codigos }
-          },
-          attributes: ['codigo'],
-          transaction: t
-        });
-
-        if (codigoPropioEnIntegrantes) {
-          await t.rollback();
-          return res.status(409).json({
-            message: 'No puedes agregarte a ti mismo como integrante del grupo',
-            codigo_conflictivo: codigoPropioEnIntegrantes.codigo
-          });
-        }
-
-        const seen = new Set();
-        const duplicados = new Set();
-
-        for (const codigo of codigos) {
-          if (seen.has(codigo)) duplicados.add(codigo);
-          else seen.add(codigo);
-        }
-
-        if (duplicados.size > 0) {
-          await t.rollback();
-          return res.status(409).json({
-            message: 'Hay códigos repetidos en el envío',
-            duplicados: [...duplicados]
-          });
-        }
-
-        const resultados = await Promise.all(
-          codigos.map(async (codigo) => {
-            const datos = await getDatosAcademicosUDH(codigo);
-            return { codigoSolicitado: codigo, datos };
-          })
-        );
-
-        const noEncontrados = resultados
-          .filter(r => !r.datos)
-          .map(r => r.codigoSolicitado);
-
-        if (noEncontrados.length > 0) {
-          await t.rollback();
-          return res.status(404).json({
-            message: 'No se encontraron datos académicos para algunos códigos',
-            codigos_no_encontrados: noEncontrados
-          });
-        }
-
-        const erroresValidacion = resultados
-          .map(r => {
-            const codigo = String(r.datos.codigo || r.codigoSolicitado);
-
-            // ✅ FIX: detectar si es virtual (empieza con "1") o presencial
-            const esVirtual = codigo.startsWith('1');
-            const anio = esVirtual
-              ? parseInt(codigo.substring(1, 5))  // Virtual:     1[2021]XXXXXX
-              : parseInt(codigo.substring(0, 4)); // Presencial:  [2021]XXXXXX
-
-            const ciclo = parseInt(r.datos.ciclo);
-
-            const errores = [];
-
-            if (isNaN(anio) || anio < 2021) {
-              errores.push('codigo_menor_2021');
-            }
-
-            if (isNaN(ciclo) || ciclo < 8) {
-              errores.push('ciclo_menor_8');
-            }
-
-            if (errores.length > 0) {
-              return {
-                codigo,
-                errores,
-                ciclo: r.datos.ciclo
-              };
-            }
-
-            return null;
-          })
-          .filter(Boolean);
-
-        if (erroresValidacion.length > 0) {
-          await t.rollback();
-          return res.status(400).json({
-            message: 'Algunos integrantes no cumplen con los requisitos (código menor a 2021 y ciclo menor a 8)',
-            detalles: erroresValidacion
-          });
-        }
-
-        const sinCorreo = resultados
-          .filter(r => !r.datos.email)
-          .map(r => r.codigoSolicitado);
-
-        if (sinCorreo.length > 0) {
-          await t.rollback();
-          return res.status(400).json({
-            message: 'Algunos estudiantes no tienen correo institucional en la consulta externa',
-            codigos_sin_correo: sinCorreo
-          });
-        }
-
-        const correosInvalidos = resultados
-          .filter(r => !String(r.datos.email).toLowerCase().endsWith('@udh.edu.pe'))
-          .map(r => ({
-            codigo: r.codigoSolicitado,
-            correo: r.datos.email
-          }));
-
-        if (correosInvalidos.length > 0) {
-          await t.rollback();
-          return res.status(400).json({
-            message: 'Algunos correos recuperados no tienen dominio @udh.edu.pe',
-            correos_invalidos: correosInvalidos
-          });
-        }
-
-        const correosSet = new Set();
-        const correosDuplicados = new Set();
-
-        for (const r of resultados) {
-          const correo = String(r.datos.email).trim().toLowerCase();
-          if (correosSet.has(correo)) {
-            correosDuplicados.add(correo);
-          } else {
-            correosSet.add(correo);
-          }
-        }
-
-        if (correosDuplicados.size > 0) {
-          await t.rollback();
-          return res.status(409).json({
-            message: 'La consulta devolvió correos institucionales repetidos',
-            correos_duplicados: [...correosDuplicados]
-          });
-        }
-
-        integrantesProcesados = resultados.map(r => ({
-          trabajo_social_id: null,
-          nombre_completo: r.datos.nombre_completo || '',
-          dni: r.datos.dni || '',
-          facultad: r.datos.facultad || '',
-          programa_academico: r.datos.programa || '',
-          codigo: r.datos.codigo || r.codigoSolicitado,
-          correo_institucional: String(r.datos.email).trim().toLowerCase(),
-          estado: 'NO_ATENDIDO'
-        }));
-
-        const incompletos = integrantesProcesados.filter(i =>
-          !i.nombre_completo ||
-          !i.dni ||
-          !i.facultad ||
-          !i.programa_academico ||
-          !i.codigo ||
-          !i.correo_institucional
-        );
-
-        if (incompletos.length > 0) {
-          await t.rollback();
-          return res.status(400).json({
-            message: 'Algunos integrantes tienen datos incompletos desde la API externa',
-            integrantes_incompletos: incompletos.map(i => ({
-              codigo: i.codigo,
-              nombre_completo: i.nombre_completo,
-              dni: i.dni,
-              facultad: i.facultad,
-              programa_academico: i.programa_academico,
-              correo_institucional: i.correo_institucional
-            }))
-          });
-        }
-
-        const codigosIntegrantes = integrantesProcesados
-          .map(i => String(i.codigo).trim())
-          .filter(Boolean);
-
-        const correosIntegrantes = integrantesProcesados
-          .map(i => String(i.correo_institucional).trim().toLowerCase())
-          .filter(Boolean);
-
-        const integrantesYaRegistrados = await IntegranteGrupo.findAll({
-          where: {
-            [Op.or]: [
-              { codigo: { [Op.in]: codigosIntegrantes } },
-              { correo_institucional: { [Op.in]: correosIntegrantes } }
-            ]
-          },
-          attributes: ['trabajo_social_id', 'codigo', 'correo_institucional'],
-          transaction: t
-        });
-
-        if (integrantesYaRegistrados.length > 0) {
-          const conflictosCodigo = [
-            ...new Set(
-              integrantesYaRegistrados
-                .map(i => i.codigo)
-                .filter(Boolean)
-            )
-          ];
-
-          const conflictosCorreo = [
-            ...new Set(
-              integrantesYaRegistrados
-                .map(i => String(i.correo_institucional || '').trim().toLowerCase())
-                .filter(Boolean)
-            )
-          ];
-
-          const trabajosRelacionados = [
-            ...new Set(
-              integrantesYaRegistrados
-                .map(i => i.trabajo_social_id)
-                .filter(Boolean)
-            )
-          ];
-
-          await t.rollback();
-          return res.status(409).json({
-            message: 'Algunos integrantes ya pertenecen a otro trabajo social',
-            codigos_conflictivos: conflictosCodigo,
-            correos_conflictivos: conflictosCorreo,
-            trabajos_sociales_relacionados: trabajosRelacionados
-          });
-        }
-      }
-
-      const nuevoRegistro = await TrabajoSocialSeleccionado.create(
-        {
-          usuario_id: parseInt(usuario_id),
-          programa_academico_id: parseInt(programa_academico_id),
-          docente_id: parseInt(docente_id),
-          labor_social_id: parseInt(labor_social_id),
-          facultad_id: parseInt(facultad_id),
-          tipo_servicio_social,
-          linea_accion_id: parseInt(linea_accion_id)
-        },
-        { transaction: t }
-      );
-
-      if (tipo_servicio_social === 'grupal') {
-        const integrantesFinal = integrantesProcesados.map(i => ({
-          ...i,
-          trabajo_social_id: nuevoRegistro.id
-        }));
-
-        await IntegranteGrupo.bulkCreate(integrantesFinal, {
-          validate: true,
-          transaction: t
-        });
-      }
-
-      await t.commit();
-
-      return res.status(201).json({
-        message: 'Trabajo social creado correctamente',
-        id: nuevoRegistro.id,
-        total_integrantes: tipo_servicio_social === 'grupal' ? integrantesProcesados.length : 0
-      });
-
-    } catch (error) {
-      await t.rollback();
-      console.error('❌ Error al guardar selección con rollback:', error);
-
-      return res.status(500).json({
-        message: 'Error al guardar selección',
-        error: error.message
-      });
-    }
-  }
-);
-
-
-// Ruta para obtener el estado del trabajo social por usuario_id
-router.get('/usuario/:usuario_id',
-  authMiddleware,
-  verificarRol('alumno', 'docente supervisor', 'gestor-udh'),
-  async (req, res) => {
-  try {
-    const usuario_id = req.params.usuario_id;
-
-    const trabajoSocial = await TrabajoSocialSeleccionado.findOne({
-      where: { usuario_id },
-      attributes: [
-        'id',
-        'usuario_id',
-        'programa_academico_id',
-        'docente_id',
-        'labor_social_id',
-        'estado_plan_labor_social',
-        'facultad_id',
-        'linea_accion_id',
-        'conformidad_plan_social',
-        'archivo_plan_social',
-        'tipo_servicio_social',
-        'solicitud_termino',
-        'carta_aceptacion_pdf',
-        'informe_final_pdf',
-        'carta_termino_pdf',
-        'estado_informe_final',
-        'certificado_final' 
-      ],
-       include: [
-        {
-          model: LineaDeAccion,
-          as: 'lineaAccion', 
-          attributes: ['nombre_linea'] 
-        }
-      ]
-    });
-
-  if (trabajoSocial) {
-      const plain = trabajoSocial.get({ plain: true });
-      plain.linea_accion = plain.lineaAccion ? plain.lineaAccion.nombre_linea : '';
-      delete plain.lineaAccion; 
-      res.status(200).json(plain);
-    } else {
-      res.status(200).json(null);
-    }
-  } catch (error) {
-    console.error('Error al obtener estado del trabajo social:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
-  }
-});
-
-
-
-router.get('/docente/:docente_id',
-  authMiddleware,
-  verificarRol('docente supervisor', 'gestor-udh'),
-  async (req, res) => {
-  try {
-    const docente_id = req.params.docente_id;
-    const trabajosSociales = await TrabajoSocialSeleccionado.findAll({
-      where: { docente_id },
-      include: [
-        { model: ProgramasAcademicos, attributes: ['nombre_programa'] },
-        { model: LaboresSociales, attributes: ['id_labores', 'nombre_labores'] },
-        { model: Estudiantes, attributes: ['nombre_estudiante'] },
-        { model: Facultades, as: 'Facultad', attributes: ['nombre_facultad'] },
-      ],
-
-      attributes: [
-        'id',
-        'usuario_id',
-        'programa_academico_id',
-        'estado_plan_labor_social',
-        'labor_social_id',
-        'archivo_plan_social',
-        'conformidad_plan_social',
-        'tipo_servicio_social',
-        'solicitud_termino',
-        'estado_informe_final'
-      ]
-    });
-
-    res.status(200).json(trabajosSociales);
-  } catch (error) {
-    console.error('Error al obtener trabajos sociales de docente:', error);
-    res.status(500).json({ message: 'Error al obtener trabajos sociales de docente', error });
-  }
-});
-
-  
-
-router.get(
-  '/docente/:docente_id/nuevo',
-  authMiddleware,
-  verificarRol('docente supervisor', 'gestor-udh'),
-  async (req, res) => {
+  router.get('/docente/:docente_id',
+    authMiddleware,
+    verificarRol('docente supervisor', 'gestor-udh'),
+    async (req, res) => {
     try {
       const docente_id = req.params.docente_id;
-
       const trabajosSociales = await TrabajoSocialSeleccionado.findAll({
-        where: {
-          docente_id,
-          conformidad_plan_social: {
-            [Op.in]: ['pendiente', 'aceptado']   
-          }
-        },
+        where: { docente_id },
         include: [
           { model: ProgramasAcademicos, attributes: ['nombre_programa'] },
           { model: LaboresSociales, attributes: ['id_labores', 'nombre_labores'] },
           { model: Estudiantes, attributes: ['nombre_estudiante'] },
           { model: Facultades, as: 'Facultad', attributes: ['nombre_facultad'] },
         ],
+
         attributes: [
           'id',
           'usuario_id',
@@ -965,419 +980,459 @@ router.get(
           'tipo_servicio_social',
           'solicitud_termino',
           'estado_informe_final'
-        ],
-        order: [['createdAt', 'DESC']]
+        ]
       });
 
       res.status(200).json(trabajosSociales);
     } catch (error) {
       console.error('Error al obtener trabajos sociales de docente:', error);
-      res
-        .status(500)
-        .json({ message: 'Error al obtener trabajos sociales de docente', error });
+      res.status(500).json({ message: 'Error al obtener trabajos sociales de docente', error });
     }
-  }
-);
+  });
+
+    
+
+  router.get(
+    '/docente/:docente_id/nuevo',
+    authMiddleware,
+    verificarRol('docente supervisor', 'gestor-udh'),
+    async (req, res) => {
+      try {
+        const docente_id = req.params.docente_id;
+
+        const trabajosSociales = await TrabajoSocialSeleccionado.findAll({
+          where: {
+            docente_id,
+            conformidad_plan_social: {
+              [Op.in]: ['pendiente', 'aceptado']   
+            }
+          },
+          include: [
+            { model: ProgramasAcademicos, attributes: ['nombre_programa'] },
+            { model: LaboresSociales, attributes: ['id_labores', 'nombre_labores'] },
+            { model: Estudiantes, attributes: ['nombre_estudiante'] },
+            { model: Facultades, as: 'Facultad', attributes: ['nombre_facultad'] },
+          ],
+          attributes: [
+            'id',
+            'usuario_id',
+            'programa_academico_id',
+            'estado_plan_labor_social',
+            'labor_social_id',
+            'archivo_plan_social',
+            'conformidad_plan_social',
+            'tipo_servicio_social',
+            'solicitud_termino',
+            'estado_informe_final'
+          ],
+          order: [['createdAt', 'DESC']]
+        });
+
+        res.status(200).json(trabajosSociales);
+      } catch (error) {
+        console.error('Error al obtener trabajos sociales de docente:', error);
+        res
+          .status(500)
+          .json({ message: 'Error al obtener trabajos sociales de docente', error });
+      }
+    }
+  );
 
 
-  // Ruta PUT para actualizar el estado del trabajo social
- router.put('/:id',
-  authMiddleware,
-  verificarRol('docente supervisor', 'gestor-udh'),
-  async (req, res) => { 
+    // Ruta PUT para actualizar el estado del trabajo social
+  router.put('/:id',
+    authMiddleware,
+    verificarRol('docente supervisor', 'gestor-udh'),
+    async (req, res) => { 
+      try {
+        const { id } = req.params;
+        const {
+          estado_plan_labor_social,
+          conformidad_plan_social,
+          observacion
+        } = req.body;
+
+        const estadosValidos = ['pendiente', 'aceptado', 'rechazado'];
+
+        if (!estado_plan_labor_social && !conformidad_plan_social && !observacion) {
+          return res.status(400).json({ message: 'Debe proporcionar al menos un campo para actualizar.' });
+        }
+
+        if (estado_plan_labor_social && !estadosValidos.includes(estado_plan_labor_social)) {
+          return res.status(400).json({ message: 'Estado de plan inválido.' });
+        }
+
+        if (conformidad_plan_social && !estadosValidos.includes(conformidad_plan_social)) {
+          return res.status(400).json({ message: 'Estado de conformidad inválido.' });
+        }
+
+        const trabajoSocial = await TrabajoSocialSeleccionado.findOne({ where: { id } });
+
+        if (!trabajoSocial) {
+          return res.status(404).json({ message: 'Trabajo social no encontrado.' });
+        }
+
+        const camposActualizar = {};
+        if (estado_plan_labor_social) camposActualizar.estado_plan_labor_social = estado_plan_labor_social;
+        if (conformidad_plan_social) camposActualizar.conformidad_plan_social = conformidad_plan_social;
+
+        const debeEliminarIntegrantes =
+          trabajoSocial.tipo_servicio_social === 'grupal' &&
+          (estado_plan_labor_social === 'rechazado' || conformidad_plan_social === 'rechazado');
+
+        if (debeEliminarIntegrantes) {
+          await IntegranteGrupo.destroy({
+            where: { trabajo_social_id: trabajoSocial.id }
+          });
+        }
+
+        if (conformidad_plan_social === 'rechazado' && trabajoSocial.archivo_plan_social) {
+          const rutaArchivo = path.join(__dirname, '..', 'uploads', 'planes_labor_social', trabajoSocial.archivo_plan_social);
+
+          try {
+            if (fs.existsSync(rutaArchivo)) {
+              await fs.promises.unlink(rutaArchivo); 
+            }
+            camposActualizar.archivo_plan_social = null; 
+          } catch (error) {
+            console.error('⚠️ Error al eliminar archivo del plan social:', error);
+          }
+        }
+
+        await trabajoSocial.update(camposActualizar);
+
+        if (observacion && String(observacion).trim()) {
+          await ObservacionTrabajoSocial.create({
+            trabajo_id: trabajoSocial.id,
+            usuario_id: req.user?.id || null,
+            tipo: 'conformidad',
+            observacion: String(observacion).trim()
+          });
+        }
+
+        res.status(200).json({
+          message: 'Trabajo social actualizado correctamente.',
+          data: trabajoSocial
+        });
+
+      } catch (error) {
+        console.error('Error al actualizar el trabajo social:', error);
+        res.status(500).json({ message: 'Error interno al actualizar el trabajo social.', error });
+      }
+    });
+
+
+
+  router.post('/generar-pdf/:id',
+    authMiddleware,
+    verificarRol('docente supervisor'),
+    async (req, res) => {
     try {
       const { id } = req.params;
-      const {
-        estado_plan_labor_social,
-        conformidad_plan_social,
-        observacion
-      } = req.body;
 
-      const estadosValidos = ['pendiente', 'aceptado', 'rechazado'];
+      const trabajo = await TrabajoSocialSeleccionado.findByPk(id, {
+        include: [
+          { model: Estudiantes, attributes: ['nombre_estudiante'] },
+          { model: LaboresSociales, attributes: ['nombre_labores'] },
+          { model: ProgramasAcademicos, attributes: ['nombre_programa'] },
+        ]
+      });
 
-      if (!estado_plan_labor_social && !conformidad_plan_social && !observacion) {
-        return res.status(400).json({ message: 'Debe proporcionar al menos un campo para actualizar.' });
+      if (!trabajo) {
+        return res.status(404).json({ message: 'Trabajo social no encontrado' });
       }
 
-      if (estado_plan_labor_social && !estadosValidos.includes(estado_plan_labor_social)) {
-        return res.status(400).json({ message: 'Estado de plan inválido.' });
-      }
+      const nombreArchivo = `carta_aceptacion_${trabajo.id}_${Date.now()}.pdf`;
+      const rutaArchivo = path.join(__dirname, '../uploads/planes_labor_social', nombreArchivo);
+      const doc = new PDFDocument();
+      doc.pipe(fs.createWriteStream(rutaArchivo));
 
-      if (conformidad_plan_social && !estadosValidos.includes(conformidad_plan_social)) {
-        return res.status(400).json({ message: 'Estado de conformidad inválido.' });
-      }
-
-      const trabajoSocial = await TrabajoSocialSeleccionado.findOne({ where: { id } });
-
-      if (!trabajoSocial) {
-        return res.status(404).json({ message: 'Trabajo social no encontrado.' });
-      }
-
-      const camposActualizar = {};
-      if (estado_plan_labor_social) camposActualizar.estado_plan_labor_social = estado_plan_labor_social;
-      if (conformidad_plan_social) camposActualizar.conformidad_plan_social = conformidad_plan_social;
-
-      const debeEliminarIntegrantes =
-        trabajoSocial.tipo_servicio_social === 'grupal' &&
-        (estado_plan_labor_social === 'rechazado' || conformidad_plan_social === 'rechazado');
-
-      if (debeEliminarIntegrantes) {
-        await IntegranteGrupo.destroy({
-          where: { trabajo_social_id: trabajoSocial.id }
-        });
-      }
-
-      if (conformidad_plan_social === 'rechazado' && trabajoSocial.archivo_plan_social) {
-        const rutaArchivo = path.join(__dirname, '..', 'uploads', 'planes_labor_social', trabajoSocial.archivo_plan_social);
-
-        try {
-          if (fs.existsSync(rutaArchivo)) {
-            await fs.promises.unlink(rutaArchivo); 
-          }
-          camposActualizar.archivo_plan_social = null; 
-        } catch (error) {
-          console.error('⚠️ Error al eliminar archivo del plan social:', error);
-        }
-      }
-
-      await trabajoSocial.update(camposActualizar);
-
-      if (observacion && String(observacion).trim()) {
-        await ObservacionTrabajoSocial.create({
-          trabajo_id: trabajoSocial.id,
-          usuario_id: req.user?.id || null,
-          tipo: 'conformidad',
-          observacion: String(observacion).trim()
-        });
-      }
+      doc.fontSize(18).text('Carta de Aceptación del Plan de Trabajo Social', { align: 'center' });
+      doc.moveDown();
+      doc.fontSize(12).text(`Nombre del estudiante: ${trabajo.Estudiante?.nombre_estudiante || 'No registrado'}`);
+      doc.text(`Programa académico: ${trabajo.ProgramasAcademico?.nombre_programa || 'N/A'}`);
+      doc.text(`Labor social: ${trabajo.LaboresSociale?.nombre_labores || 'N/A'}`);
+      doc.text(`Fecha de aceptación: ${new Date().toLocaleDateString()}`);
+      doc.end();
+      await trabajo.update({ carta_aceptacion_pdf: nombreArchivo });
 
       res.status(200).json({
-        message: 'Trabajo social actualizado correctamente.',
-        data: trabajoSocial
+        message: 'Carta de aceptación generada correctamente',
+        archivo: nombreArchivo
       });
 
     } catch (error) {
-      console.error('Error al actualizar el trabajo social:', error);
-      res.status(500).json({ message: 'Error interno al actualizar el trabajo social.', error });
+      console.error('Error al generar el PDF:', error);
+      res.status(500).json({ message: 'Error al generar PDF', error });
+    }
+  });
+  router.get('/pdf/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const trabajo = await TrabajoSocialSeleccionado.findByPk(id);
+
+      if (!trabajo || !trabajo.carta_aceptacion_pdf) {
+        return res.status(404).json({ message: 'Archivo no encontrado para este trabajo social' });
+      }
+
+      const rutaPDF = path.join(__dirname, '../uploads/planes_labor_social', trabajo.carta_aceptacion_pdf);
+      if (!fs.existsSync(rutaPDF)) {
+        return res.status(404).json({ message: 'Archivo PDF no existe en el servidor' });
+      }
+      res.sendFile(rutaPDF);
+    } catch (error) {
+      console.error('Error al servir el PDF:', error);
+      res.status(500).json({ message: 'Error interno al servir PDF', error });
+    }
+  });
+
+  router.post('/guardar-pdf-html',
+    authMiddleware,
+    verificarRol('docente supervisor'),
+    upload.single('archivo'),
+    async (req, res) => {
+    try {
+      const { trabajo_id } = req.body;
+
+      if (!trabajo_id || !req.file) {
+        return res.status(400).json({ message: 'ID de trabajo o archivo faltante' });
+      }
+
+      const trabajo = await TrabajoSocialSeleccionado.findByPk(trabajo_id);
+
+      if (!trabajo) {
+        return res.status(404).json({ message: 'Trabajo social no encontrado' });
+      }
+      await trabajo.update({
+        carta_aceptacion_pdf: req.file.filename
+      });
+
+      res.status(200).json({
+        message: 'PDF guardado correctamente',
+        archivo: req.file.filename
+      });
+
+    } catch (error) {
+      console.error('Error al guardar el PDF desde el frontend:', error);
+      res.status(500).json({ message: 'Error al guardar el PDF', error });
     }
   });
 
 
 
-router.post('/generar-pdf/:id',
-  authMiddleware,
-  verificarRol('docente supervisor'),
-  async (req, res) => {
-  try {
-    const { id } = req.params;
+  router.get('/certificado-final/:trabajo_id', async (req, res) => {
+    try {
+      const { trabajo_id } = req.params;
 
-    const trabajo = await TrabajoSocialSeleccionado.findByPk(id, {
-      include: [
-        { model: Estudiantes, attributes: ['nombre_estudiante'] },
-        { model: LaboresSociales, attributes: ['nombre_labores'] },
-        { model: ProgramasAcademicos, attributes: ['nombre_programa'] },
-      ]
-    });
+      const trabajo = await TrabajoSocialSeleccionado.findByPk(trabajo_id, {
+        attributes: ['certificado_final']
+      });
 
-    if (!trabajo) {
-      return res.status(404).json({ message: 'Trabajo social no encontrado' });
-    }
+      if (!trabajo || !trabajo.certificado_final) {
+        return res.status(404).json({ message: 'Certificado final no encontrado' });
+      }
 
-    const nombreArchivo = `carta_aceptacion_${trabajo.id}_${Date.now()}.pdf`;
-    const rutaArchivo = path.join(__dirname, '../uploads/planes_labor_social', nombreArchivo);
-    const doc = new PDFDocument();
-    doc.pipe(fs.createWriteStream(rutaArchivo));
-
-    doc.fontSize(18).text('Carta de Aceptación del Plan de Trabajo Social', { align: 'center' });
-    doc.moveDown();
-    doc.fontSize(12).text(`Nombre del estudiante: ${trabajo.Estudiante?.nombre_estudiante || 'No registrado'}`);
-    doc.text(`Programa académico: ${trabajo.ProgramasAcademico?.nombre_programa || 'N/A'}`);
-    doc.text(`Labor social: ${trabajo.LaboresSociale?.nombre_labores || 'N/A'}`);
-    doc.text(`Fecha de aceptación: ${new Date().toLocaleDateString()}`);
-    doc.end();
-    await trabajo.update({ carta_aceptacion_pdf: nombreArchivo });
-
-    res.status(200).json({
-      message: 'Carta de aceptación generada correctamente',
-      archivo: nombreArchivo
-    });
-
-  } catch (error) {
-    console.error('Error al generar el PDF:', error);
-    res.status(500).json({ message: 'Error al generar PDF', error });
-  }
-});
-router.get('/pdf/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const trabajo = await TrabajoSocialSeleccionado.findByPk(id);
-
-    if (!trabajo || !trabajo.carta_aceptacion_pdf) {
-      return res.status(404).json({ message: 'Archivo no encontrado para este trabajo social' });
-    }
-
-    const rutaPDF = path.join(__dirname, '../uploads/planes_labor_social', trabajo.carta_aceptacion_pdf);
-    if (!fs.existsSync(rutaPDF)) {
-      return res.status(404).json({ message: 'Archivo PDF no existe en el servidor' });
-    }
-    res.sendFile(rutaPDF);
-  } catch (error) {
-    console.error('Error al servir el PDF:', error);
-    res.status(500).json({ message: 'Error interno al servir PDF', error });
-  }
-});
-
-router.post('/guardar-pdf-html',
-  authMiddleware,
-  verificarRol('docente supervisor'),
-  upload.single('archivo'),
-  async (req, res) => {
-  try {
-    const { trabajo_id } = req.body;
-
-    if (!trabajo_id || !req.file) {
-      return res.status(400).json({ message: 'ID de trabajo o archivo faltante' });
-    }
-
-    const trabajo = await TrabajoSocialSeleccionado.findByPk(trabajo_id);
-
-    if (!trabajo) {
-      return res.status(404).json({ message: 'Trabajo social no encontrado' });
-    }
-    await trabajo.update({
-      carta_aceptacion_pdf: req.file.filename
-    });
-
-    res.status(200).json({
-      message: 'PDF guardado correctamente',
-      archivo: req.file.filename
-    });
-
-  } catch (error) {
-    console.error('Error al guardar el PDF desde el frontend:', error);
-    res.status(500).json({ message: 'Error al guardar el PDF', error });
-  }
-});
-
-
-
-router.get('/certificado-final/:trabajo_id', async (req, res) => {
-  try {
-    const { trabajo_id } = req.params;
-
-    const trabajo = await TrabajoSocialSeleccionado.findByPk(trabajo_id, {
-      attributes: ['certificado_final']
-    });
-
-    if (!trabajo || !trabajo.certificado_final) {
-      return res.status(404).json({ message: 'Certificado final no encontrado' });
-    }
-
-    const rutaPDF = path.join(
-      __dirname,
-      '../uploads/certificados_finales',
-      trabajo.certificado_final
-    );
-
-    if (!fs.existsSync(rutaPDF)) {
-      return res.status(404).json({ message: 'Archivo PDF no existe en el servidor' });
-    }
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader(
-      'Content-Disposition',
-      'inline; filename="certificado_final.pdf"'
-    );
-
-    return res.sendFile(rutaPDF);
-
-  } catch (error) {
-    console.error('Error al servir certificado final:', error);
-    return res.status(500).json({ message: 'Error interno al servir certificado final' });
-  }
-});
-
-
-router.get('/:id',
-  authMiddleware,
-  verificarRol('alumno', 'docente supervisor', 'gestor-udh'),
-  async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const trabajo = await TrabajoSocialSeleccionado.findByPk(id, {
-      include: [
-        { model: Estudiantes, attributes: ['nombre_estudiante'] },
-        { model: ProgramasAcademicos, attributes: ['nombre_programa'] },
-        { model: LaboresSociales, attributes: ['nombre_labores'] },
-      ]
-    });
-
-    if (!trabajo) {
-      return res.status(404).json({ message: 'Trabajo no encontrado' });
-    }
-
-    res.status(200).json(trabajo);
-  } catch (error) {
-    console.error('Error al obtener trabajo social por ID:', error);
-    res.status(500).json({ message: 'Error interno', error });
-  }
-});
-
-
-
-router.post('/subir-plan-social',
-  authMiddleware,
-  verificarRol('alumno'),
-  uploadArchivoPlan.single('archivo_plan_social'),
-  async (req, res) => {
-  try {
-    const { usuario_id } = req.body;
-    const archivo = req.file?.filename;
-
-    if (!usuario_id || !archivo) {
-      return res.status(400).json({ message: 'Datos incompletos' });
-    }
-
-    const trabajo = await TrabajoSocialSeleccionado.findOne({ where: { usuario_id } });
-
-    if (!trabajo) {
-      return res.status(404).json({ message: 'No se encontró trabajo social con ese usuario_id' });
-    }
-    if (!trabajo.carta_aceptacion_pdf || trabajo.estado_plan_labor_social !== 'aceptado') {
-    return res.status(400).json({
-      message: 'No puedes subir el plan social. Se requiere carta de aceptación y estado del plan aprobado.'
-    });
-    }
-    if (trabajo.archivo_plan_social) {
-      const rutaAnterior = path.join(
+      const rutaPDF = path.join(
         __dirname,
-        '..',
-        'uploads',
-        'planes_labor_social',
-        trabajo.archivo_plan_social
+        '../uploads/certificados_finales',
+        trabajo.certificado_final
       );
 
-      try {
-        if (fs.existsSync(rutaAnterior)) {
-          await fs.promises.unlink(rutaAnterior);
-        }
-      } catch (error) {
-        console.error('⚠️ Error al eliminar archivo anterior:', error);
+      if (!fs.existsSync(rutaPDF)) {
+        return res.status(404).json({ message: 'Archivo PDF no existe en el servidor' });
       }
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        'inline; filename="certificado_final.pdf"'
+      );
+
+      return res.sendFile(rutaPDF);
+
+    } catch (error) {
+      console.error('Error al servir certificado final:', error);
+      return res.status(500).json({ message: 'Error interno al servir certificado final' });
     }
-
-    await trabajo.update({
-      archivo_plan_social: archivo,
-      conformidad_plan_social: 'pendiente' 
-    });
-
-    res.status(200).json({ message: 'Archivo subido correctamente y estado actualizado', archivo });
-  } catch (error) {
-    console.error('Error al subir el plan social:', error);
-    res.status(500).json({ message: 'Error interno al subir archivo', error });
-  }
-});
+  });
 
 
+  router.get('/:id',
+    authMiddleware,
+    verificarRol('alumno', 'docente supervisor', 'gestor-udh'),
+    async (req, res) => {
+    try {
+      const { id } = req.params;
 
-router.patch('/:id/solicitar-carta-termino',
-  authMiddleware,
-  verificarRol('alumno'),
-  async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const trabajo = await TrabajoSocialSeleccionado.findByPk(id);
-
-    if (!trabajo) {
-      return res.status(404).json({ message: 'Trabajo no encontrado' });
-    }
-    if (trabajo.conformidad_plan_social !== 'aceptado') {
-      return res.status(400).json({
-        message: 'No puedes solicitar la carta de término. El plan social debe estar aprobado.'
+      const trabajo = await TrabajoSocialSeleccionado.findByPk(id, {
+        include: [
+          { model: Estudiantes, attributes: ['nombre_estudiante'] },
+          { model: ProgramasAcademicos, attributes: ['nombre_programa'] },
+          { model: LaboresSociales, attributes: ['nombre_labores'] },
+        ]
       });
+
+      if (!trabajo) {
+        return res.status(404).json({ message: 'Trabajo no encontrado' });
+      }
+
+      res.status(200).json(trabajo);
+    } catch (error) {
+      console.error('Error al obtener trabajo social por ID:', error);
+      res.status(500).json({ message: 'Error interno', error });
     }
-    if (trabajo.solicitud_termino !== 'no_solicitada') {
-      return res.status(400).json({ message: 'La solicitud ya fue enviada o está en revisión' });
+  });
+
+
+  router.post('/subir-plan-social',
+    authMiddleware,
+    verificarRol('alumno'),
+    uploadArchivoPlan.single('archivo_plan_social'),
+    async (req, res) => {
+    try {
+      const { usuario_id } = req.body;
+      const archivo = req.file?.filename;
+
+      if (!usuario_id || !archivo) {
+        return res.status(400).json({ message: 'Datos incompletos' });
+      }
+
+      const trabajo = await TrabajoSocialSeleccionado.findOne({ where: { usuario_id } });
+
+      if (!trabajo) {
+        return res.status(404).json({ message: 'No se encontró trabajo social con ese usuario_id' });
+      }
+      if (!trabajo.carta_aceptacion_pdf || trabajo.estado_plan_labor_social !== 'aceptado') {
+      return res.status(400).json({
+        message: 'No puedes subir el plan social. Se requiere carta de aceptación y estado del plan aprobado.'
+      });
+      }
+      if (trabajo.archivo_plan_social) {
+        const rutaAnterior = path.join(
+          __dirname,
+          '..',
+          'uploads',
+          'planes_labor_social',
+          trabajo.archivo_plan_social
+        );
+
+        try {
+          if (fs.existsSync(rutaAnterior)) {
+            await fs.promises.unlink(rutaAnterior);
+          }
+        } catch (error) {
+          console.error('⚠️ Error al eliminar archivo anterior:', error);
+        }
+      }
+
+      await trabajo.update({
+        archivo_plan_social: archivo,
+        conformidad_plan_social: 'pendiente' 
+      });
+
+      res.status(200).json({ message: 'Archivo subido correctamente y estado actualizado', archivo });
+    } catch (error) {
+      console.error('Error al subir el plan social:', error);
+      res.status(500).json({ message: 'Error interno al subir archivo', error });
+    }
+  });
+
+
+  router.patch('/:id/solicitar-carta-termino',
+    authMiddleware,
+    verificarRol('alumno'),
+    async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      const trabajo = await TrabajoSocialSeleccionado.findByPk(id);
+
+      if (!trabajo) {
+        return res.status(404).json({ message: 'Trabajo no encontrado' });
+      }
+      if (trabajo.conformidad_plan_social !== 'aceptado') {
+        return res.status(400).json({
+          message: 'No puedes solicitar la carta de término. El plan social debe estar aprobado.'
+        });
+      }
+      if (trabajo.solicitud_termino !== 'no_solicitada') {
+        return res.status(400).json({ message: 'La solicitud ya fue enviada o está en revisión' });
+      }
+
+      trabajo.solicitud_termino = 'solicitada';
+      await trabajo.save();
+
+      res.json({ message: 'Carta de término solicitada correctamente', estado: trabajo.solicitud_termino });
+    } catch (error) {
+      console.error('Error al solicitar carta de término:', error);
+      res.status(500).json({ message: 'Error al procesar la solicitud' });
+    }
+  });
+
+
+  router.patch('/:id/respuesta-carta-termino',
+    authMiddleware,
+    verificarRol('docente supervisor'),
+    async (req, res) => {
+    const { id } = req.params;
+    const { solicitud_termino } = req.body;
+
+    const valoresPermitidos = ['aprobada', 'rechazada'];
+
+    if (!valoresPermitidos.includes(solicitud_termino)) {
+      return res.status(400).json({ message: 'Valor inválido para solicitud_termino' });
     }
 
-    trabajo.solicitud_termino = 'solicitada';
-    await trabajo.save();
+    try {
+      const trabajo = await TrabajoSocialSeleccionado.findByPk(id);
 
-    res.json({ message: 'Carta de término solicitada correctamente', estado: trabajo.solicitud_termino });
-  } catch (error) {
-    console.error('Error al solicitar carta de término:', error);
-    res.status(500).json({ message: 'Error al procesar la solicitud' });
-  }
-});
+      if (!trabajo) {
+        return res.status(404).json({ message: 'Trabajo social no encontrado' });
+      }
+      if (trabajo.solicitud_termino !== 'solicitada') {
+        return res.status(400).json({ message: 'Aún no hay solicitud activa para responder' });
+      }
 
+      await trabajo.update({ solicitud_termino });
 
-
-router.patch('/:id/respuesta-carta-termino',
-  authMiddleware,
-  verificarRol('docente supervisor'),
-  async (req, res) => {
-  const { id } = req.params;
-  const { solicitud_termino } = req.body;
-
-  const valoresPermitidos = ['aprobada', 'rechazada'];
-
-  if (!valoresPermitidos.includes(solicitud_termino)) {
-    return res.status(400).json({ message: 'Valor inválido para solicitud_termino' });
-  }
-
-  try {
-    const trabajo = await TrabajoSocialSeleccionado.findByPk(id);
-
-    if (!trabajo) {
-      return res.status(404).json({ message: 'Trabajo social no encontrado' });
+      res.json({
+        message: `Solicitud de carta de término ${solicitud_termino} correctamente.`,
+        estado: trabajo.solicitud_termino
+      });
+    } catch (error) {
+      console.error('Error al actualizar solicitud de término:', error);
+      res.status(500).json({ message: 'Error al actualizar estado de la solicitud', error });
     }
-    if (trabajo.solicitud_termino !== 'solicitada') {
-      return res.status(400).json({ message: 'Aún no hay solicitud activa para responder' });
+  });
+
+
+  router.post('/guardar-carta-termino',
+    authMiddleware,
+    verificarRol('docente supervisor'),
+    uploadCartaTermino.single('archivo'),
+    async (req, res) => {
+    try {
+      const { trabajo_id } = req.body;
+
+      if (!trabajo_id || !req.file) {
+        return res.status(400).json({ message: 'Faltan datos obligatorios' });
+      }
+
+      const trabajo = await TrabajoSocialSeleccionado.findByPk(trabajo_id);
+
+      if (!trabajo) {
+        return res.status(404).json({ message: 'Trabajo no encontrado' });
+      }
+
+      await trabajo.update({ carta_termino_pdf: req.file.filename });
+
+      res.status(200).json({ message: 'Carta de término guardada correctamente', archivo: req.file.filename });
+    } catch (error) {
+      console.error('Error al guardar la carta de término:', error);
+      res.status(500).json({ message: 'Error interno al guardar carta de término', error });
     }
-
-    await trabajo.update({ solicitud_termino });
-
-    res.json({
-      message: `Solicitud de carta de término ${solicitud_termino} correctamente.`,
-      estado: trabajo.solicitud_termino
-    });
-  } catch (error) {
-    console.error('Error al actualizar solicitud de término:', error);
-    res.status(500).json({ message: 'Error al actualizar estado de la solicitud', error });
-  }
-});
-
-
-
-router.post('/guardar-carta-termino',
-  authMiddleware,
-  verificarRol('docente supervisor'),
-  uploadCartaTermino.single('archivo'),
-  async (req, res) => {
-  try {
-    const { trabajo_id } = req.body;
-
-    if (!trabajo_id || !req.file) {
-      return res.status(400).json({ message: 'Faltan datos obligatorios' });
-    }
-
-    const trabajo = await TrabajoSocialSeleccionado.findByPk(trabajo_id);
-
-    if (!trabajo) {
-      return res.status(404).json({ message: 'Trabajo no encontrado' });
-    }
-
-    await trabajo.update({ carta_termino_pdf: req.file.filename });
-
-    res.status(200).json({ message: 'Carta de término guardada correctamente', archivo: req.file.filename });
-  } catch (error) {
-    console.error('Error al guardar la carta de término:', error);
-    res.status(500).json({ message: 'Error interno al guardar carta de término', error });
-  }
-});
+  });
 
 router.patch('/estado/:id',
   authMiddleware,
@@ -1391,7 +1446,6 @@ router.patch('/estado/:id',
     return res.status(400).json({ message: 'Estado inválido' });
   }
 
-  // Si es rechazado, la observación es obligatoria
   if (nuevo_estado === 'rechazado' && (!observacion || observacion.trim() === '')) {
     return res.status(400).json({ message: 'Debe proporcionar una observación al rechazar el informe' });
   }
