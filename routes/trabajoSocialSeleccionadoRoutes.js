@@ -15,6 +15,7 @@
   const Facultades = require('../models/Facultades'); 
   const ObservacionTrabajoSocial = require('../models/ObservacionTrabajoSocial');
   const LineaDeAccion = require('../models/LineaDeAccion'); 
+  const SystemConfig = require('../models/SystemConfig');
   const Docentes = require('../models/Docentes');
   const CartaAceptacion = require('../models/CartaAceptacion');
   const { getDatosAcademicosUDH } = require('../services/udhservicenuevo');
@@ -535,369 +536,411 @@ router.patch(
   });
 
   router.post(
-    '/',
-    authMiddleware,
-    verificarRol('alumno'),
-    async (req, res) => {
-      const t = await sequelize.transaction();
+  '/',
+  authMiddleware,
+  verificarRol('alumno'),
+  async (req, res) => {
+    const t = await sequelize.transaction();
 
-      try {
-        const {
-          usuario_id,
-          programa_academico_id,
-          docente_id,
-          labor_social_id,
-          facultad_id,
-          tipo_servicio_social,
-          linea_accion_id,
-          integrantes
-        } = req.body;
+    try {
+      const {
+        usuario_id,
+        programa_academico_id,
+        docente_id,
+        labor_social_id,
+        facultad_id,
+        tipo_servicio_social,
+        linea_accion_id,
+        integrantes
+      } = req.body;
 
-        if (!usuario_id || isNaN(usuario_id)) {
-          await t.rollback();
-          return res.status(400).json({ message: 'usuario_id inválido' });
-        }
-
-        if (!facultad_id || isNaN(facultad_id)) {
-          await t.rollback();
-          return res.status(400).json({ message: 'facultad_id inválido' });
-        }
-
-        if (!programa_academico_id || isNaN(programa_academico_id)) {
-          await t.rollback();
-          return res.status(400).json({ message: 'programa_academico_id inválido' });
-        }
-
-        if (!docente_id || isNaN(docente_id)) {
-          await t.rollback();
-          return res.status(400).json({ message: 'docente_id inválido' });
-        }
-
-        if (!labor_social_id || isNaN(labor_social_id)) {
-          await t.rollback();
-          return res.status(400).json({ message: 'labor_social_id inválido' });
-        }
-
-        if (!linea_accion_id || isNaN(linea_accion_id)) {
-          await t.rollback();
-          return res.status(400).json({ message: 'linea_accion_id inválido' });
-        }
-
-        if (!['individual', 'grupal'].includes(tipo_servicio_social)) {
-          await t.rollback();
-          return res.status(400).json({ message: 'tipo_servicio_social inválido' });
-        }
-
-        let integrantesProcesados = [];
-
-        if (tipo_servicio_social === 'grupal') {
-          if (!Array.isArray(integrantes)) {
-            await t.rollback();
-            return res.status(400).json({
-              message: 'Debes enviar un arreglo de integrantes'
-            });
-          }
-
-          if (integrantes.length === 0) {
-            await t.rollback();
-            return res.status(400).json({
-              message: 'Debes enviar al menos un integrante'
-            });
-          }
-
-          const codigos = integrantes
-            .map(item => {
-              if (typeof item === 'string' || typeof item === 'number') {
-                return String(item).trim();
-              }
-              if (item && item.codigo) {
-                return String(item.codigo).trim();
-              }
-              return '';
-            })
-            .filter(Boolean);
-
-          if (codigos.length === 0) {
-            await t.rollback();
-            return res.status(400).json({
-              message: 'No se enviaron códigos válidos'
-            });
-          }
-
-          const codigoPropioEnIntegrantes = await Estudiantes.findOne({
-            where: {
-              id_usuario: parseInt(usuario_id),
-              codigo: { [Op.in]: codigos }
-            },
-            attributes: ['codigo'],
-            transaction: t
-          });
-
-          if (codigoPropioEnIntegrantes) {
-            await t.rollback();
-            return res.status(409).json({
-              message: 'No puedes agregarte a ti mismo como integrante del grupo',
-              codigo_conflictivo: codigoPropioEnIntegrantes.codigo
-            });
-          }
-
-          const seen = new Set();
-          const duplicados = new Set();
-
-          for (const codigo of codigos) {
-            if (seen.has(codigo)) duplicados.add(codigo);
-            else seen.add(codigo);
-          }
-
-          if (duplicados.size > 0) {
-            await t.rollback();
-            return res.status(409).json({
-              message: 'Hay códigos repetidos en el envío',
-              duplicados: [...duplicados]
-            });
-          }
-
-          const resultados = await Promise.all(
-            codigos.map(async (codigo) => {
-              const datos = await getDatosAcademicosUDH(codigo);
-              return { codigoSolicitado: codigo, datos };
-            })
-          );
-
-          const noEncontrados = resultados
-            .filter(r => !r.datos)
-            .map(r => r.codigoSolicitado);
-
-          if (noEncontrados.length > 0) {
-            await t.rollback();
-            return res.status(404).json({
-              message: 'No se encontraron datos académicos para algunos códigos',
-              codigos_no_encontrados: noEncontrados
-            });
-          }
-
-          const erroresValidacion = resultados
-            .map(r => {
-              const codigo = String(r.datos.codigo || r.codigoSolicitado);
-
-              // ✅ FIX: detectar si es virtual (empieza con "1") o presencial
-              const esVirtual = codigo.startsWith('1');
-              const anio = esVirtual
-                ? parseInt(codigo.substring(1, 5))  // Virtual:     1[2021]XXXXXX
-                : parseInt(codigo.substring(0, 4)); // Presencial:  [2021]XXXXXX
-
-              const ciclo = parseInt(r.datos.ciclo);
-
-              const errores = [];
-
-              if (isNaN(anio) || anio < 2021) {
-                errores.push('codigo_menor_2021');
-              }
-
-              if (isNaN(ciclo) || ciclo < 8) {
-                errores.push('ciclo_menor_8');
-              }
-
-              if (errores.length > 0) {
-                return {
-                  codigo,
-                  errores,
-                  ciclo: r.datos.ciclo
-                };
-              }
-
-              return null;
-            })
-            .filter(Boolean);
-
-          if (erroresValidacion.length > 0) {
-            await t.rollback();
-            return res.status(400).json({
-              message: 'Algunos integrantes no cumplen con los requisitos (código menor a 2021 y ciclo menor a 8)',
-              detalles: erroresValidacion
-            });
-          }
-
-          const sinCorreo = resultados
-            .filter(r => !r.datos.email)
-            .map(r => r.codigoSolicitado);
-
-          if (sinCorreo.length > 0) {
-            await t.rollback();
-            return res.status(400).json({
-              message: 'Algunos estudiantes no tienen correo institucional en la consulta externa',
-              codigos_sin_correo: sinCorreo
-            });
-          }
-
-          const correosInvalidos = resultados
-            .filter(r => !String(r.datos.email).toLowerCase().endsWith('@udh.edu.pe'))
-            .map(r => ({
-              codigo: r.codigoSolicitado,
-              correo: r.datos.email
-            }));
-
-          if (correosInvalidos.length > 0) {
-            await t.rollback();
-            return res.status(400).json({
-              message: 'Algunos correos recuperados no tienen dominio @udh.edu.pe',
-              correos_invalidos: correosInvalidos
-            });
-          }
-
-          const correosSet = new Set();
-          const correosDuplicados = new Set();
-
-          for (const r of resultados) {
-            const correo = String(r.datos.email).trim().toLowerCase();
-            if (correosSet.has(correo)) {
-              correosDuplicados.add(correo);
-            } else {
-              correosSet.add(correo);
-            }
-          }
-
-          if (correosDuplicados.size > 0) {
-            await t.rollback();
-            return res.status(409).json({
-              message: 'La consulta devolvió correos institucionales repetidos',
-              correos_duplicados: [...correosDuplicados]
-            });
-          }
-
-          integrantesProcesados = resultados.map(r => ({
-            trabajo_social_id: null,
-            nombre_completo: r.datos.nombre_completo || '',
-            dni: r.datos.dni || '',
-            facultad: r.datos.facultad || '',
-            programa_academico: r.datos.programa || '',
-            codigo: r.datos.codigo || r.codigoSolicitado,
-            correo_institucional: String(r.datos.email).trim().toLowerCase(),
-            estado: 'NO_ATENDIDO'
-          }));
-
-          const incompletos = integrantesProcesados.filter(i =>
-            !i.nombre_completo ||
-            !i.dni ||
-            !i.facultad ||
-            !i.programa_academico ||
-            !i.codigo ||
-            !i.correo_institucional
-          );
-
-          if (incompletos.length > 0) {
-            await t.rollback();
-            return res.status(400).json({
-              message: 'Algunos integrantes tienen datos incompletos desde la API externa',
-              integrantes_incompletos: incompletos.map(i => ({
-                codigo: i.codigo,
-                nombre_completo: i.nombre_completo,
-                dni: i.dni,
-                facultad: i.facultad,
-                programa_academico: i.programa_academico,
-                correo_institucional: i.correo_institucional
-              }))
-            });
-          }
-
-          const codigosIntegrantes = integrantesProcesados
-            .map(i => String(i.codigo).trim())
-            .filter(Boolean);
-
-          const correosIntegrantes = integrantesProcesados
-            .map(i => String(i.correo_institucional).trim().toLowerCase())
-            .filter(Boolean);
-
-          const integrantesYaRegistrados = await IntegranteGrupo.findAll({
-            where: {
-              [Op.or]: [
-                { codigo: { [Op.in]: codigosIntegrantes } },
-                { correo_institucional: { [Op.in]: correosIntegrantes } }
-              ]
-            },
-            attributes: ['trabajo_social_id', 'codigo', 'correo_institucional'],
-            transaction: t
-          });
-
-          if (integrantesYaRegistrados.length > 0) {
-            const conflictosCodigo = [
-              ...new Set(
-                integrantesYaRegistrados
-                  .map(i => i.codigo)
-                  .filter(Boolean)
-              )
-            ];
-
-            const conflictosCorreo = [
-              ...new Set(
-                integrantesYaRegistrados
-                  .map(i => String(i.correo_institucional || '').trim().toLowerCase())
-                  .filter(Boolean)
-              )
-            ];
-
-            const trabajosRelacionados = [
-              ...new Set(
-                integrantesYaRegistrados
-                  .map(i => i.trabajo_social_id)
-                  .filter(Boolean)
-              )
-            ];
-
-            await t.rollback();
-            return res.status(409).json({
-              message: 'Algunos integrantes ya pertenecen a otro trabajo social',
-              codigos_conflictivos: conflictosCodigo,
-              correos_conflictivos: conflictosCorreo,
-              trabajos_sociales_relacionados: trabajosRelacionados
-            });
-          }
-        }
-
-        const nuevoRegistro = await TrabajoSocialSeleccionado.create(
-          {
-            usuario_id: parseInt(usuario_id),
-            programa_academico_id: parseInt(programa_academico_id),
-            docente_id: parseInt(docente_id),
-            labor_social_id: parseInt(labor_social_id),
-            facultad_id: parseInt(facultad_id),
-            tipo_servicio_social,
-            linea_accion_id: parseInt(linea_accion_id)
-          },
-          { transaction: t }
-        );
-
-        if (tipo_servicio_social === 'grupal') {
-          const integrantesFinal = integrantesProcesados.map(i => ({
-            ...i,
-            trabajo_social_id: nuevoRegistro.id
-          }));
-
-          await IntegranteGrupo.bulkCreate(integrantesFinal, {
-            validate: true,
-            transaction: t
-          });
-        }
-
-        await t.commit();
-
-        return res.status(201).json({
-          message: 'Trabajo social creado correctamente',
-          id: nuevoRegistro.id,
-          total_integrantes: tipo_servicio_social === 'grupal' ? integrantesProcesados.length : 0
-        });
-
-      } catch (error) {
+      if (!usuario_id || isNaN(usuario_id)) {
         await t.rollback();
-        console.error('❌ Error al guardar selección con rollback:', error);
+        return res.status(400).json({ message: 'usuario_id inválido' });
+      }
 
-        return res.status(500).json({
-          message: 'Error al guardar selección',
-          error: error.message
+      // ✅ Verificar si el alumno ya inició servicio social
+      const servicioExistente = await TrabajoSocialSeleccionado.findOne({
+        where: { usuario_id: parseInt(usuario_id) },
+        transaction: t
+      });
+
+      if (servicioExistente) {
+        await t.rollback();
+        return res.status(409).json({
+          message: 'Ya tienes un servicio social iniciado',
+          trabajo_social_id: servicioExistente.id
         });
       }
+
+      // ✅ Verificar configuración global del sistema
+      const config = await SystemConfig.findByPk(1, {
+        transaction: t
+      });
+
+      if (!config) {
+        await t.rollback();
+        return res.status(500).json({
+          message: 'Configuración del sistema no encontrada'
+        });
+      }
+
+      // ✅ Si el gestor desactivó el inicio, bloquear nuevos registros
+      if (Number(config.inicio_servicio_social_habilitado) !== 1) {
+        await t.rollback();
+        return res.status(403).json({
+          message: 'El inicio de servicio social está deshabilitado actualmente'
+        });
+      }
+
+      if (!facultad_id || isNaN(facultad_id)) {
+        await t.rollback();
+        return res.status(400).json({ message: 'facultad_id inválido' });
+      }
+
+      if (!programa_academico_id || isNaN(programa_academico_id)) {
+        await t.rollback();
+        return res.status(400).json({ message: 'programa_academico_id inválido' });
+      }
+
+      if (!docente_id || isNaN(docente_id)) {
+        await t.rollback();
+        return res.status(400).json({ message: 'docente_id inválido' });
+      }
+
+      if (!labor_social_id || isNaN(labor_social_id)) {
+        await t.rollback();
+        return res.status(400).json({ message: 'labor_social_id inválido' });
+      }
+
+      if (!linea_accion_id || isNaN(linea_accion_id)) {
+        await t.rollback();
+        return res.status(400).json({ message: 'linea_accion_id inválido' });
+      }
+
+      if (!['individual', 'grupal'].includes(tipo_servicio_social)) {
+        await t.rollback();
+        return res.status(400).json({ message: 'tipo_servicio_social inválido' });
+      }
+
+      let integrantesProcesados = [];
+
+      if (tipo_servicio_social === 'grupal') {
+        if (!Array.isArray(integrantes)) {
+          await t.rollback();
+          return res.status(400).json({
+            message: 'Debes enviar un arreglo de integrantes'
+          });
+        }
+
+        if (integrantes.length === 0) {
+          await t.rollback();
+          return res.status(400).json({
+            message: 'Debes enviar al menos un integrante'
+          });
+        }
+
+        const codigos = integrantes
+          .map(item => {
+            if (typeof item === 'string' || typeof item === 'number') {
+              return String(item).trim();
+            }
+
+            if (item && item.codigo) {
+              return String(item.codigo).trim();
+            }
+
+            return '';
+          })
+          .filter(Boolean);
+
+        if (codigos.length === 0) {
+          await t.rollback();
+          return res.status(400).json({
+            message: 'No se enviaron códigos válidos'
+          });
+        }
+
+        const codigoPropioEnIntegrantes = await Estudiantes.findOne({
+          where: {
+            id_usuario: parseInt(usuario_id),
+            codigo: { [Op.in]: codigos }
+          },
+          attributes: ['codigo'],
+          transaction: t
+        });
+
+        if (codigoPropioEnIntegrantes) {
+          await t.rollback();
+          return res.status(409).json({
+            message: 'No puedes agregarte a ti mismo como integrante del grupo',
+            codigo_conflictivo: codigoPropioEnIntegrantes.codigo
+          });
+        }
+
+        const seen = new Set();
+        const duplicados = new Set();
+
+        for (const codigo of codigos) {
+          if (seen.has(codigo)) {
+            duplicados.add(codigo);
+          } else {
+            seen.add(codigo);
+          }
+        }
+
+        if (duplicados.size > 0) {
+          await t.rollback();
+          return res.status(409).json({
+            message: 'Hay códigos repetidos en el envío',
+            duplicados: [...duplicados]
+          });
+        }
+
+        const resultados = await Promise.all(
+          codigos.map(async (codigo) => {
+            const datos = await getDatosAcademicosUDH(codigo);
+            return { codigoSolicitado: codigo, datos };
+          })
+        );
+
+        const noEncontrados = resultados
+          .filter(r => !r.datos)
+          .map(r => r.codigoSolicitado);
+
+        if (noEncontrados.length > 0) {
+          await t.rollback();
+          return res.status(404).json({
+            message: 'No se encontraron datos académicos para algunos códigos',
+            codigos_no_encontrados: noEncontrados
+          });
+        }
+
+        const erroresValidacion = resultados
+          .map(r => {
+            const codigo = String(r.datos.codigo || r.codigoSolicitado);
+
+            const esVirtual = codigo.startsWith('1');
+            const anio = esVirtual
+              ? parseInt(codigo.substring(1, 5))
+              : parseInt(codigo.substring(0, 4));
+
+            const ciclo = parseInt(r.datos.ciclo);
+
+            const errores = [];
+
+            if (isNaN(anio) || anio < 2021) {
+              errores.push('codigo_menor_2021');
+            }
+
+            if (isNaN(ciclo) || ciclo < 8) {
+              errores.push('ciclo_menor_8');
+            }
+
+            if (errores.length > 0) {
+              return {
+                codigo,
+                errores,
+                ciclo: r.datos.ciclo
+              };
+            }
+
+            return null;
+          })
+          .filter(Boolean);
+
+        if (erroresValidacion.length > 0) {
+          await t.rollback();
+          return res.status(400).json({
+            message: 'Algunos integrantes no cumplen con los requisitos (código menor a 2021 y ciclo menor a 8)',
+            detalles: erroresValidacion
+          });
+        }
+
+        const sinCorreo = resultados
+          .filter(r => !r.datos.email)
+          .map(r => r.codigoSolicitado);
+
+        if (sinCorreo.length > 0) {
+          await t.rollback();
+          return res.status(400).json({
+            message: 'Algunos estudiantes no tienen correo institucional en la consulta externa',
+            codigos_sin_correo: sinCorreo
+          });
+        }
+
+        const correosInvalidos = resultados
+          .filter(r => !String(r.datos.email).toLowerCase().endsWith('@udh.edu.pe'))
+          .map(r => ({
+            codigo: r.codigoSolicitado,
+            correo: r.datos.email
+          }));
+
+        if (correosInvalidos.length > 0) {
+          await t.rollback();
+          return res.status(400).json({
+            message: 'Algunos correos recuperados no tienen dominio @udh.edu.pe',
+            correos_invalidos: correosInvalidos
+          });
+        }
+
+        const correosSet = new Set();
+        const correosDuplicados = new Set();
+
+        for (const r of resultados) {
+          const correo = String(r.datos.email).trim().toLowerCase();
+
+          if (correosSet.has(correo)) {
+            correosDuplicados.add(correo);
+          } else {
+            correosSet.add(correo);
+          }
+        }
+
+        if (correosDuplicados.size > 0) {
+          await t.rollback();
+          return res.status(409).json({
+            message: 'La consulta devolvió correos institucionales repetidos',
+            correos_duplicados: [...correosDuplicados]
+          });
+        }
+
+        integrantesProcesados = resultados.map(r => ({
+          trabajo_social_id: null,
+          nombre_completo: r.datos.nombre_completo || '',
+          dni: r.datos.dni || '',
+          facultad: r.datos.facultad || '',
+          programa_academico: r.datos.programa || '',
+          codigo: r.datos.codigo || r.codigoSolicitado,
+          correo_institucional: String(r.datos.email).trim().toLowerCase(),
+          estado: 'NO_ATENDIDO'
+        }));
+
+        const incompletos = integrantesProcesados.filter(i =>
+          !i.nombre_completo ||
+          !i.dni ||
+          !i.facultad ||
+          !i.programa_academico ||
+          !i.codigo ||
+          !i.correo_institucional
+        );
+
+        if (incompletos.length > 0) {
+          await t.rollback();
+          return res.status(400).json({
+            message: 'Algunos integrantes tienen datos incompletos desde la API externa',
+            integrantes_incompletos: incompletos.map(i => ({
+              codigo: i.codigo,
+              nombre_completo: i.nombre_completo,
+              dni: i.dni,
+              facultad: i.facultad,
+              programa_academico: i.programa_academico,
+              correo_institucional: i.correo_institucional
+            }))
+          });
+        }
+
+        const codigosIntegrantes = integrantesProcesados
+          .map(i => String(i.codigo).trim())
+          .filter(Boolean);
+
+        const correosIntegrantes = integrantesProcesados
+          .map(i => String(i.correo_institucional).trim().toLowerCase())
+          .filter(Boolean);
+
+        const integrantesYaRegistrados = await IntegranteGrupo.findAll({
+          where: {
+            [Op.or]: [
+              { codigo: { [Op.in]: codigosIntegrantes } },
+              { correo_institucional: { [Op.in]: correosIntegrantes } }
+            ]
+          },
+          attributes: ['trabajo_social_id', 'codigo', 'correo_institucional'],
+          transaction: t
+        });
+
+        if (integrantesYaRegistrados.length > 0) {
+          const conflictosCodigo = [
+            ...new Set(
+              integrantesYaRegistrados
+                .map(i => i.codigo)
+                .filter(Boolean)
+            )
+          ];
+
+          const conflictosCorreo = [
+            ...new Set(
+              integrantesYaRegistrados
+                .map(i => String(i.correo_institucional || '').trim().toLowerCase())
+                .filter(Boolean)
+            )
+          ];
+
+          const trabajosRelacionados = [
+            ...new Set(
+              integrantesYaRegistrados
+                .map(i => i.trabajo_social_id)
+                .filter(Boolean)
+            )
+          ];
+
+          await t.rollback();
+          return res.status(409).json({
+            message: 'Algunos integrantes ya pertenecen a otro trabajo social',
+            codigos_conflictivos: conflictosCodigo,
+            correos_conflictivos: conflictosCorreo,
+            trabajos_sociales_relacionados: trabajosRelacionados
+          });
+        }
+      }
+
+      const nuevoRegistro = await TrabajoSocialSeleccionado.create(
+        {
+          usuario_id: parseInt(usuario_id),
+          programa_academico_id: parseInt(programa_academico_id),
+          docente_id: parseInt(docente_id),
+          labor_social_id: parseInt(labor_social_id),
+          facultad_id: parseInt(facultad_id),
+          tipo_servicio_social,
+          linea_accion_id: parseInt(linea_accion_id)
+        },
+        { transaction: t }
+      );
+
+      if (tipo_servicio_social === 'grupal') {
+        const integrantesFinal = integrantesProcesados.map(i => ({
+          ...i,
+          trabajo_social_id: nuevoRegistro.id
+        }));
+
+        await IntegranteGrupo.bulkCreate(integrantesFinal, {
+          validate: true,
+          transaction: t
+        });
+      }
+
+      await t.commit();
+
+      return res.status(201).json({
+        message: 'Trabajo social creado correctamente',
+        id: nuevoRegistro.id,
+        total_integrantes: tipo_servicio_social === 'grupal'
+          ? integrantesProcesados.length
+          : 0
+      });
+
+    } catch (error) {
+      await t.rollback();
+
+      console.error('❌ Error al guardar selección con rollback:', error);
+
+      return res.status(500).json({
+        message: 'Error al guardar selección',
+        error: error.message
+      });
     }
-  );
+  }
+);
 
 
   // Ruta para obtener el estado del trabajo social por usuario_id
@@ -1285,11 +1328,12 @@ router.patch(
   });
 
 
-  router.post('/subir-plan-social',
-    authMiddleware,
-    verificarRol('alumno'),
-    uploadArchivoPlan.single('archivo_plan_social'),
-    async (req, res) => {
+ router.post(
+  '/subir-plan-social',
+  authMiddleware,
+  verificarRol('alumno'),
+  uploadArchivoPlan.single('archivo_plan_social'),
+  async (req, res) => {
     try {
       const { usuario_id } = req.body;
       const archivo = req.file?.filename;
@@ -1298,16 +1342,105 @@ router.patch(
         return res.status(400).json({ message: 'Datos incompletos' });
       }
 
-      const trabajo = await TrabajoSocialSeleccionado.findOne({ where: { usuario_id } });
+      const trabajo = await TrabajoSocialSeleccionado.findOne({
+        where: { usuario_id }
+      });
 
       if (!trabajo) {
-        return res.status(404).json({ message: 'No se encontró trabajo social con ese usuario_id' });
+        // Si multer ya guardó el archivo, lo eliminamos
+        if (archivo) {
+          const rutaArchivo = path.join(
+            __dirname,
+            '..',
+            'uploads',
+            'planes_labor_social',
+            archivo
+          );
+
+          if (fs.existsSync(rutaArchivo)) {
+            await fs.promises.unlink(rutaArchivo);
+          }
+        }
+
+        return res.status(404).json({
+          message: 'No se encontró trabajo social con ese usuario_id'
+        });
       }
+
+      // ✅ Verificar configuración global
+      const config = await SystemConfig.findByPk(1);
+
+      if (!config) {
+        // Si multer ya guardó el archivo, lo eliminamos
+        if (archivo) {
+          const rutaArchivo = path.join(
+            __dirname,
+            '..',
+            'uploads',
+            'planes_labor_social',
+            archivo
+          );
+
+          if (fs.existsSync(rutaArchivo)) {
+            await fs.promises.unlink(rutaArchivo);
+          }
+        }
+
+        return res.status(500).json({
+          message: 'Configuración del sistema no encontrada'
+        });
+      }
+
+      // ✅ Si el inicio está deshabilitado y aún no tiene plan subido, bloquear
+      if (
+        Number(config.inicio_servicio_social_habilitado) !== 1 &&
+        !trabajo.archivo_plan_social
+      ) {
+        // Como multer ya subió el archivo, lo eliminamos
+        const rutaArchivo = path.join(
+          __dirname,
+          '..',
+          'uploads',
+          'planes_labor_social',
+          archivo
+        );
+
+        try {
+          if (fs.existsSync(rutaArchivo)) {
+            await fs.promises.unlink(rutaArchivo);
+          }
+        } catch (error) {
+          console.error('⚠️ Error al eliminar archivo bloqueado:', error);
+        }
+
+        return res.status(403).json({
+          message: 'La subida del plan social está deshabilitada actualmente'
+        });
+      }
+
       if (!trabajo.carta_aceptacion_pdf || trabajo.estado_plan_labor_social !== 'aceptado') {
-      return res.status(400).json({
-        message: 'No puedes subir el plan social. Se requiere carta de aceptación y estado del plan aprobado.'
-      });
+        // Si multer ya guardó el archivo, lo eliminamos
+        const rutaArchivo = path.join(
+          __dirname,
+          '..',
+          'uploads',
+          'planes_labor_social',
+          archivo
+        );
+
+        try {
+          if (fs.existsSync(rutaArchivo)) {
+            await fs.promises.unlink(rutaArchivo);
+          }
+        } catch (error) {
+          console.error('⚠️ Error al eliminar archivo no permitido:', error);
+        }
+
+        return res.status(400).json({
+          message: 'No puedes subir el plan social. Se requiere carta de aceptación y estado del plan aprobado.'
+        });
       }
+
       if (trabajo.archivo_plan_social) {
         const rutaAnterior = path.join(
           __dirname,
@@ -1328,15 +1461,24 @@ router.patch(
 
       await trabajo.update({
         archivo_plan_social: archivo,
-        conformidad_plan_social: 'pendiente' 
+        conformidad_plan_social: 'pendiente'
       });
 
-      res.status(200).json({ message: 'Archivo subido correctamente y estado actualizado', archivo });
+      return res.status(200).json({
+        message: 'Archivo subido correctamente y estado actualizado',
+        archivo
+      });
+
     } catch (error) {
       console.error('Error al subir el plan social:', error);
-      res.status(500).json({ message: 'Error interno al subir archivo', error });
+
+      return res.status(500).json({
+        message: 'Error interno al subir archivo',
+        error
+      });
     }
-  });
+  }
+);
 
 
   router.patch('/:id/solicitar-carta-termino',

@@ -117,4 +117,102 @@ router.put('/registro',
   }
 );
 
+// ✅ Obtener estado actual del inicio de servicio social
+router.get('/inicio-servicio-social',
+  authMiddleware,
+  verificarRol('gestor-udh'),
+  async (req, res) => {
+    try {
+      const config = await SystemConfig.findByPk(1);
+
+      if (!config) {
+        return res.status(404).json({ message: 'Configuración no encontrada' });
+      }
+
+      return res.status(200).json({
+        inicio_servicio_social_habilitado:
+          Number(config.inicio_servicio_social_habilitado) === 1
+      });
+    } catch (error) {
+      console.error('Error obteniendo config de inicio de servicio social:', error);
+      return res.status(500).json({
+        message: 'Error obteniendo configuración de inicio de servicio social'
+      });
+    }
+  }
+);
+
+router.put('/inicio-servicio-social',
+  authMiddleware,
+  verificarRol('gestor-udh'),
+  async (req, res) => {
+    try {
+      const { inicio_servicio_social_habilitado } = req.body;
+
+      if (
+        inicio_servicio_social_habilitado === undefined ||
+        inicio_servicio_social_habilitado === null
+      ) {
+        return res.status(400).json({
+          message: 'El campo inicio_servicio_social_habilitado es requerido'
+        });
+      }
+
+      // Acepta: true/false, 1/0, "1"/"0"
+      const nuevoValor =
+        Number(inicio_servicio_social_habilitado) === 1 ||
+        inicio_servicio_social_habilitado === true
+          ? 1
+          : 0;
+
+      const config = await SystemConfig.findByPk(1);
+
+      if (!config) {
+        return res.status(404).json({ message: 'Configuración no encontrada' });
+      }
+
+      config.inicio_servicio_social_habilitado = nuevoValor;
+      config.updated_at = new Date();
+      await config.save();
+
+      return res.status(200).json({
+        message: 'Configuración actualizada',
+        inicio_servicio_social_habilitado:
+          Number(config.inicio_servicio_social_habilitado) === 1
+      });
+    } catch (error) {
+      console.error('Error actualizando config de inicio de servicio social:', error);
+      return res.status(500).json({
+        message: 'Error actualizando configuración de inicio de servicio social'
+      });
+    }
+  }
+);
+
+// ✅ Obtener estado del inicio de servicio social para alumnos
+router.get('/inicio-servicio-social/alumno',
+  authMiddleware,
+  verificarRol('alumno'),
+  async (req, res) => {
+    try {
+      const config = await SystemConfig.findByPk(1);
+
+      if (!config) {
+        return res.status(404).json({ message: 'Configuración no encontrada' });
+      }
+
+      return res.status(200).json({
+        inicio_servicio_social_habilitado:
+          Number(config.inicio_servicio_social_habilitado) === 1
+      });
+    } catch (error) {
+      console.error('Error obteniendo config de inicio de servicio social para alumno:', error);
+
+      return res.status(500).json({
+        message: 'Error obteniendo configuración de inicio de servicio social'
+      });
+    }
+  }
+);
+
 module.exports = router;

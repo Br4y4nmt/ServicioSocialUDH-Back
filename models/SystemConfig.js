@@ -22,6 +22,12 @@ SystemConfig.init(
       defaultValue: true,
     },
 
+    inicio_servicio_social_habilitado: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+    },
+
     updated_at: {
       type: DataTypes.DATE,
       allowNull: false,
