@@ -1354,9 +1354,6 @@ router.get(
               updatedAt:
                 item.updatedAt,
 
-              // ======================================
-              // CAMPOS CALCULADOS
-              // ======================================
               tipo_plazo:
                 tipoPlazo,
 
@@ -1385,9 +1382,6 @@ router.get(
           }
         );
 
-      // ==========================================
-      // RESPUESTA FINAL
-      // ==========================================
       return res.status(200).json({
         trabajo: {
           id:

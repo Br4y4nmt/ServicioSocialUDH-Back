@@ -157,8 +157,6 @@ router.put('/inicio-servicio-social',
           message: 'El campo inicio_servicio_social_habilitado es requerido'
         });
       }
-
-      // Acepta: true/false, 1/0, "1"/"0"
       const nuevoValor =
         Number(inicio_servicio_social_habilitado) === 1 ||
         inicio_servicio_social_habilitado === true
@@ -189,7 +187,7 @@ router.put('/inicio-servicio-social',
   }
 );
 
-// ✅ Obtener estado del inicio de servicio social para alumnos
+// Obtener estado del inicio de servicio social para alumnos
 router.get('/inicio-servicio-social/alumno',
   authMiddleware,
   verificarRol('alumno'),

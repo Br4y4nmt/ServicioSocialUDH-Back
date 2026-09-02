@@ -21,6 +21,21 @@ const eliminarArchivo = async (archivo) => {
   }
 };
 
+const corregirNombreArchivo = (nombre = '') => {
+  try {
+    const corregido = Buffer
+      .from(nombre, 'latin1')
+      .toString('utf8')
+      .normalize('NFC');
+
+    return corregido.includes('�')
+      ? nombre
+      : corregido;
+  } catch {
+    return nombre;
+  }
+};
+
 const eliminarArchivoGuardado = async (rutaArchivo) => {
   if (!rutaArchivo) return;
 
@@ -148,7 +163,9 @@ router.post(
 
       const documento = await DocumentoOficial.create({
         titulo: titulo.trim(),
-        nombre_original: req.file.originalname,
+        nombre_original: corregirNombreArchivo(
+          req.file.originalname
+        ),
         nombre_archivo: req.file.filename,
         ruta_archivo: `/uploads/documentos/${req.file.filename}`,
         tipo: 'PDF',
@@ -178,6 +195,7 @@ router.post(
     }
   }
 );
+
 router.put(
   '/:id',
   authMiddleware,
@@ -249,23 +267,16 @@ router.put(
       documento.estado = estado || documento.estado;
       documento.publicado = publicadoBoolean;
       documento.orden = ordenNumero;
-
+      
       if (req.file) {
-        documento.nombre_original =
-          req.file.originalname;
-
-        documento.nombre_archivo =
-          req.file.filename;
-
-        documento.ruta_archivo =
-          `/uploads/documentos/${req.file.filename}`;
-
+        documento.nombre_original = corregirNombreArchivo(
+          req.file.originalname
+        );
+        documento.nombre_archivo = req.file.filename;
+        documento.ruta_archivo = `/uploads/documentos/${req.file.filename}`;
         documento.tipo = 'PDF';
-        documento.mime_type =
-          req.file.mimetype;
-
-        documento.tamano_bytes =
-          req.file.size;
+        documento.mime_type = req.file.mimetype;
+        documento.tamano_bytes = req.file.size;
       }
 
       await documento.save();
