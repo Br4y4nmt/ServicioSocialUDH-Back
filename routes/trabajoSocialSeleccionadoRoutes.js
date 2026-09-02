@@ -1,4 +1,4 @@
-  const express = require('express');
+ const express = require('express');
   const authMiddleware = require('../middlewares/authMiddleware');
   const verificarRol = require('../middlewares/verificarRol');
   const router = express.Router();
@@ -128,47 +128,495 @@
     }
   });
 
-  router.get('/supervisores',
-    authMiddleware,
-    verificarRol('gestor-udh', 'docente supervisor', 'programa-academico'),
-    async (req, res) => {
-      try {
-        const rows = await TrabajoSocialSeleccionado.findAll({
-          include: [
-            { model: Estudiantes, attributes: ['nombre_estudiante'] },
-            { model: ProgramasAcademicos, attributes: ['nombre_programa'] },
-            { model: Docentes, attributes: ['nombre_docente'], as: 'Docente' }, 
-          ],
+
+router.get(
+  '/vencidos-sin-evidencia',
+  authMiddleware,
+  verificarRol(
+    'gestor-udh',
+  ),
+  async (req, res) => {
+    try {
+
+      const ahora = new Date();
+      const actividadesSinEvidencia =
+        await CronogramaActividades.findAll({
+          where: {
+            [Op.and]: [
+              {
+                [Op.or]: [
+                  {
+                    evidencia: null,
+                  },
+                  {
+                    evidencia: '',
+                  },
+                ],
+              },
+              {
+                fecha_fin_primero: {
+                  [Op.ne]: null,
+                },
+              },
+            ],
+          },
+
           attributes: [
             'id',
-            'estado_plan_labor_social',
-            'carta_aceptacion_pdf',
-            'usuario_id',
-            'programa_academico_id',
-            'docente_id'
+            'trabajo_social_id',
+            'actividad',
+            'fecha',
+            'fecha_fin',
+            'fecha_fin_primero',
+            'estado',
+            'evidencia',
+            'correccion_habilitada',
+            'fecha_observacion',
+            'fecha_limite_reenvio',
           ],
-          order: [['createdAt', 'DESC']]
         });
 
-        const data = rows.map(r => {
-          const p = r.get({ plain: true });
-          return {
-            id: p.id,
-            estudiante: { nombre_estudiante: p.Estudiante?.nombre_estudiante || null },
-            programa:   { nombre_programa:   p.ProgramasAcademico?.nombre_programa || null },
-            estado: p.estado_plan_labor_social || 'pendiente',
-            carta_aceptacion_pdf: p.carta_aceptacion_pdf || null,
-            supervisor: { nombre_supervisor: p.Docente?.nombre_docente || null }
-          };
-        });
+      const actividadesVencidas =
+        actividadesSinEvidencia
+          .map((actividad) => {
+            const item = actividad.get({
+              plain: true,
+            });
 
-        res.status(200).json(data);
-      } catch (error) {
-        console.error('Error al obtener supervisores:', error);
-        res.status(500).json({ message: 'Error al obtener supervisores', error });
+            let fechaLimite = null;
+            let tipoPlazo = 'normal';
+
+
+            if (
+              item.estado === 'observado' &&
+              item.correccion_habilitada === true &&
+              item.fecha_limite_reenvio
+            ) {
+              tipoPlazo = 'reenvio';
+
+              fechaLimite = new Date(
+                item.fecha_limite_reenvio
+              );
+            }
+
+            else if (item.fecha_fin_primero) {
+              const fechaBase = new Date(
+                item.fecha_fin_primero
+              );
+
+              if (
+                !Number.isNaN(
+                  fechaBase.getTime()
+                )
+              ) {
+                fechaLimite = new Date(
+                  fechaBase
+                );
+
+                fechaLimite.setDate(
+                  fechaLimite.getDate() + 10
+                );
+
+                fechaLimite.setHours(
+                  23,
+                  59,
+                  59,
+                  999
+                );
+              }
+            }
+
+            if (
+              !fechaLimite ||
+              Number.isNaN(
+                fechaLimite.getTime()
+              )
+            ) {
+              return null;
+            }
+
+            if (ahora <= fechaLimite) {
+              return null;
+            }
+
+
+            return {
+              id: item.id,
+
+              trabajo_social_id:
+                item.trabajo_social_id,
+
+              actividad:
+                item.actividad,
+
+              fecha:
+                item.fecha,
+
+              fecha_fin:
+                item.fecha_fin,
+
+              fecha_fin_primero:
+                item.fecha_fin_primero,
+
+              evidencia:
+                item.evidencia,
+
+              estado:
+                item.estado,
+
+              correccion_habilitada:
+                item.correccion_habilitada,
+
+              fecha_limite_reenvio:
+                item.fecha_limite_reenvio,
+
+              tipo_plazo:
+                tipoPlazo,
+
+              fecha_limite_actual:
+                fechaLimite.toISOString(),
+
+              estado_plazo:
+                'vencido',
+
+              estado_evidencia:
+                'no_enviado',
+            };
+          })
+          .filter(Boolean);
+
+      if (actividadesVencidas.length === 0) {
+        return res.status(200).json([]);
       }
+
+      const trabajosIds = [
+        ...new Set(
+          actividadesVencidas.map(
+            (actividad) =>
+              actividad.trabajo_social_id
+          )
+        ),
+      ];
+
+      const trabajos =
+        await TrabajoSocialSeleccionado.findAll({
+          where: {
+            id: {
+              [Op.in]: trabajosIds,
+            },
+          },
+
+          include: [
+            {
+              model: Estudiantes,
+
+              attributes: [
+                'nombre_estudiante',
+              ],
+
+              required: false,
+            },
+
+            {
+              model: ProgramasAcademicos,
+
+              attributes: [
+                'nombre_programa',
+              ],
+
+              required: false,
+            },
+
+            {
+              model: Docentes,
+
+              as: 'Docente',
+
+              attributes: [
+                'nombre_docente',
+              ],
+
+              required: false,
+            },
+          ],
+
+          order: [
+            ['createdAt', 'DESC'],
+          ],
+        });
+
+      const idsTrabajosGrupales =
+        trabajos
+          .filter(
+            (trabajo) =>
+              (
+                trabajo.tipo_servicio_social ||
+                ''
+              )
+                .toString()
+                .trim()
+                .toLowerCase() ===
+              'grupal'
+          )
+          .map(
+            (trabajo) =>
+              trabajo.id
+          );
+
+      let integrantes = [];
+
+      if (
+        idsTrabajosGrupales.length > 0
+      ) {
+        integrantes =
+          await IntegranteGrupo.findAll({
+            where: {
+              trabajo_social_id: {
+                [Op.in]:
+                  idsTrabajosGrupales,
+              },
+            },
+
+            order: [
+              [
+                'trabajo_social_id',
+                'ASC',
+              ],
+              [
+                'id_integrante',
+                'ASC',
+              ],
+            ],
+          });
+      }
+
+      const integrantesPorTrabajo = {};
+
+      integrantes.forEach(
+        (integrante) => {
+          const item =
+            integrante.get({
+              plain: true,
+            });
+
+          const trabajoId =
+            item.trabajo_social_id;
+
+          if (
+            !integrantesPorTrabajo[
+              trabajoId
+            ]
+          ) {
+            integrantesPorTrabajo[
+              trabajoId
+            ] = [];
+          }
+
+          integrantesPorTrabajo[
+            trabajoId
+          ].push(item);
+        }
+      );
+      const actividadesPorTrabajo = {};
+
+      actividadesVencidas.forEach(
+        (actividad) => {
+          const trabajoId =
+            actividad.trabajo_social_id;
+
+          if (
+            !actividadesPorTrabajo[
+              trabajoId
+            ]
+          ) {
+            actividadesPorTrabajo[
+              trabajoId
+            ] = [];
+          }
+
+          actividadesPorTrabajo[
+            trabajoId
+          ].push(actividad);
+        }
+      );
+
+      const data = trabajos.map(
+        (trabajo) => {
+          const trabajoPlain =
+            trabajo.get({
+              plain: true,
+            });
+
+          const esGrupal =
+            (
+              trabajoPlain.tipo_servicio_social ||
+              ''
+            )
+              .toString()
+              .trim()
+              .toLowerCase() ===
+            'grupal';
+
+          const vencidas =
+            actividadesPorTrabajo[
+              trabajoPlain.id
+            ] || [];
+
+          return {
+            ...trabajoPlain,
+
+            integrantes_grupo:
+              esGrupal
+                ? integrantesPorTrabajo[
+                    trabajoPlain.id
+                  ] || []
+                : [],
+
+            total_actividades_vencidas:
+              vencidas.length,
+
+            actividades_vencidas:
+              vencidas,
+          };
+        }
+      );
+
+      // ==========================================
+      // RESPUESTA
+      // ==========================================
+
+      return res
+        .status(200)
+        .json(data);
+    } catch (error) {
+      console.error(
+        'Error al obtener trabajos sociales con actividades vencidas:',
+        error
+      );
+
+      return res.status(500).json({
+        message:
+          'Error al obtener trabajos sociales con actividades vencidas sin evidencia',
+
+        error:
+          error.message,
+      });
     }
-  );
+  }
+);
+
+router.get(
+  '/trabajos-sociales',
+  authMiddleware,
+  verificarRol(
+    'gestor-udh',
+    'docente supervisor',
+    'programa-academico'
+  ),
+  async (req, res) => {
+    try {
+      const trabajos = await TrabajoSocialSeleccionado.findAll({
+        include: [
+          {
+            model: Estudiantes,
+            attributes: ['nombre_estudiante'],
+            required: false,
+          },
+          {
+            model: ProgramasAcademicos,
+            attributes: ['nombre_programa'],
+            required: false,
+          },
+          {
+            model: Docentes,
+            as: 'Docente',
+            attributes: ['nombre_docente'],
+            required: false,
+          },
+        ],
+        order: [['createdAt', 'DESC']],
+      });
+
+      const idsTrabajosGrupales = trabajos
+        .filter(
+          (trabajo) =>
+            (trabajo.tipo_servicio_social || '')
+              .toString()
+              .trim()
+              .toLowerCase() === 'grupal'
+        )
+        .map((trabajo) => trabajo.id);
+
+      let integrantes = [];
+
+      if (idsTrabajosGrupales.length > 0) {
+        integrantes = await IntegranteGrupo.findAll({
+          where: {
+            trabajo_social_id: {
+              [Op.in]: idsTrabajosGrupales,
+            },
+          },
+          order: [
+            ['trabajo_social_id', 'ASC'],
+            ['id_integrante', 'ASC'],
+          ],
+        });
+      }
+
+      // 4. Agrupar integrantes por trabajo_social_id
+      const integrantesPorTrabajo = {};
+
+      integrantes.forEach((integrante) => {
+        const integrantePlain = integrante.get({
+          plain: true,
+        });
+
+        const trabajoId = integrantePlain.trabajo_social_id;
+
+        if (!integrantesPorTrabajo[trabajoId]) {
+          integrantesPorTrabajo[trabajoId] = [];
+        }
+
+        integrantesPorTrabajo[trabajoId].push(
+          integrantePlain
+        );
+      });
+
+      // 5. Construir respuesta final
+      const data = trabajos.map((trabajo) => {
+        const trabajoPlain = trabajo.get({
+          plain: true,
+        });
+
+        const esGrupal =
+          (trabajoPlain.tipo_servicio_social || '')
+            .toString()
+            .trim()
+            .toLowerCase() === 'grupal';
+
+        return {
+          ...trabajoPlain,
+
+          integrantes_grupo: esGrupal
+            ? integrantesPorTrabajo[trabajoPlain.id] || []
+            : [],
+        };
+      });
+
+      return res.status(200).json(data);
+    } catch (error) {
+      console.error(
+        'Error al obtener trabajos sociales:',
+        error
+      );
+
+      return res.status(500).json({
+        message: 'Error al obtener trabajos sociales',
+        error: error.message,
+      });
+    }
+  }
+);
 
 router.patch(
   '/:id/corregir-plan',
@@ -480,27 +928,6 @@ router.patch(
     }
   );
     
-  router.delete('/seleccionado/:id', authMiddleware, async (req, res) => {
-    const { id } = req.params;
-
-    try {
-      const trabajo = await TrabajoSocialSeleccionado.findByPk(id);
-
-      if (!trabajo) {
-        return res.status(404).json({ message: 'No se encontró la elección del trabajo social' });
-      }
-
-      await trabajo.destroy();
-
-      res.status(200).json({ message: 'Elección eliminada correctamente' });
-    } catch (error) {
-      console.error('Error al eliminar elección:', error);
-      res.status(500).json({ message: 'Error al eliminar la elección' });
-    }
-  });
-
-
-  // 📩 Ruta para guardar el informe final generado desde el frontend
   router.post('/guardar-informe-final',
     authMiddleware,
     verificarRol('alumno'),
@@ -942,8 +1369,6 @@ router.patch(
   }
 );
 
-
-  // Ruta para obtener el estado del trabajo social por usuario_id
   router.get('/usuario/:usuario_id',
     authMiddleware,
     verificarRol('alumno', 'docente supervisor', 'gestor-udh'),
@@ -995,8 +1420,6 @@ router.patch(
     }
   });
 
-
-
   router.get('/docente/:docente_id',
     authMiddleware,
     verificarRol('docente supervisor', 'gestor-udh'),
@@ -1032,8 +1455,6 @@ router.patch(
       res.status(500).json({ message: 'Error al obtener trabajos sociales de docente', error });
     }
   });
-
-    
 
   router.get(
     '/docente/:docente_id/nuevo',
@@ -1081,8 +1502,6 @@ router.patch(
     }
   );
 
-
-    // Ruta PUT para actualizar el estado del trabajo social
   router.put('/:id',
     authMiddleware,
     verificarRol('docente supervisor', 'gestor-udh'),
@@ -1164,8 +1583,6 @@ router.patch(
       }
     });
 
-
-
   router.post('/generar-pdf/:id',
     authMiddleware,
     verificarRol('docente supervisor'),
@@ -1209,6 +1626,7 @@ router.patch(
       res.status(500).json({ message: 'Error al generar PDF', error });
     }
   });
+
   router.get('/pdf/:id', async (req, res) => {
     try {
       const { id } = req.params;
@@ -1261,7 +1679,6 @@ router.patch(
       res.status(500).json({ message: 'Error al guardar el PDF', error });
     }
   });
-
 
 
   router.get('/certificado-final/:trabajo_id', async (req, res) => {
@@ -1347,7 +1764,6 @@ router.patch(
       });
 
       if (!trabajo) {
-        // Si multer ya guardó el archivo, lo eliminamos
         if (archivo) {
           const rutaArchivo = path.join(
             __dirname,
@@ -1367,11 +1783,9 @@ router.patch(
         });
       }
 
-      // ✅ Verificar configuración global
       const config = await SystemConfig.findByPk(1);
 
       if (!config) {
-        // Si multer ya guardó el archivo, lo eliminamos
         if (archivo) {
           const rutaArchivo = path.join(
             __dirname,
@@ -1391,12 +1805,10 @@ router.patch(
         });
       }
 
-      // ✅ Si el inicio está deshabilitado y aún no tiene plan subido, bloquear
       if (
         Number(config.inicio_servicio_social_habilitado) !== 1 &&
         !trabajo.archivo_plan_social
       ) {
-        // Como multer ya subió el archivo, lo eliminamos
         const rutaArchivo = path.join(
           __dirname,
           '..',
@@ -1419,7 +1831,6 @@ router.patch(
       }
 
       if (!trabajo.carta_aceptacion_pdf || trabajo.estado_plan_labor_social !== 'aceptado') {
-        // Si multer ya guardó el archivo, lo eliminamos
         const rutaArchivo = path.join(
           __dirname,
           '..',
@@ -1479,7 +1890,6 @@ router.patch(
     }
   }
 );
-
 
   router.patch('/:id/solicitar-carta-termino',
     authMiddleware,
@@ -1721,7 +2131,6 @@ router.get('/documentos-trabajo/:id', async (req, res) => {
 });
 
 
-
 router.get("/documento-termino/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -1763,7 +2172,6 @@ router.get("/documento-termino/:id", async (req, res) => {
     return res.status(500).json({ message: "Error interno al servir PDF de término" });
   }
 });
-
 
 
 router.get('/seguimiento/:id_estudiante',
@@ -1828,7 +2236,6 @@ router.get('/seguimiento/:id_estudiante',
 });
 
 
-
 router.get(
   '/fecha-fin-primero/:usuario_id',
   authMiddleware,
@@ -1873,7 +2280,6 @@ router.get(
     }
   }
 );
-
 
 
 router.post(
@@ -2004,7 +2410,6 @@ router.post(
 );
 
 
-
 router.put(
   '/actualizar-fecha/:id',
   authMiddleware,
@@ -2038,8 +2443,6 @@ router.put(
     }
   }
 );
-
-
 
 
 router.get(
@@ -2105,7 +2508,6 @@ router.get(
     }
   }
 );
-
 
 
 router.get(
@@ -2191,8 +2593,6 @@ router.get(
   }
 );
 
-
-
 router.put(
   '/cambio-asesor/:id',
   authMiddleware,
@@ -2243,7 +2643,6 @@ router.put(
   }
 );
 
-// Ruta para obtener el motivo de rechazo del informe final
 router.get(
   '/motivo-rechazo-informe/:trabajoId',
   authMiddleware,
@@ -2290,5 +2689,332 @@ router.get(
     }
   }
 );
+
+router.delete(
+  '/:trabajoId/integrantes/:integranteId',
+  authMiddleware,
+  verificarRol('gestor-udh'),
+  async (req, res) => {
+    const t = await sequelize.transaction();
+
+    try {
+      const { trabajoId, integranteId } = req.params;
+
+      const trabajoIdNumero = Number(trabajoId);
+      const integranteIdNumero = Number(integranteId);
+
+      if (
+        !Number.isInteger(trabajoIdNumero) ||
+        !Number.isInteger(integranteIdNumero)
+      ) {
+        await t.rollback();
+
+        return res.status(400).json({
+          message: 'ID de trabajo social o integrante inválido',
+        });
+      }
+
+      const integrante = await IntegranteGrupo.findOne({
+        where: {
+          id_integrante: integranteIdNumero,
+          trabajo_social_id: trabajoIdNumero,
+        },
+        transaction: t,
+      });
+
+      if (!integrante) {
+        await t.rollback();
+
+        return res.status(404).json({
+          message: 'Integrante no encontrado en este trabajo social',
+        });
+      }
+
+      const codigoUniversitario = String(
+        integrante.codigo || ''
+      ).trim();
+
+      let archivosCarta = [];
+
+      if (codigoUniversitario) {
+        const cartas = await CartaAceptacion.findAll({
+          where: {
+            trabajo_id: trabajoIdNumero,
+            codigo_universitario: codigoUniversitario,
+          },
+          attributes: [
+            'id',
+            'nombre_archivo_pdf',
+          ],
+          transaction: t,
+        });
+
+        archivosCarta = cartas
+          .map((carta) => carta.nombre_archivo_pdf)
+          .filter(Boolean);
+
+        await CartaAceptacion.destroy({
+          where: {
+            trabajo_id: trabajoIdNumero,
+            codigo_universitario: codigoUniversitario,
+          },
+          transaction: t,
+        });
+      }
+
+      await integrante.destroy({
+        transaction: t,
+      });
+
+      await t.commit();
+
+      for (const nombreArchivo of archivosCarta) {
+        try {
+          const rutaArchivo = path.join(
+            __dirname,
+            '..',
+            'uploads',
+            'cartas_aceptacion',
+            nombreArchivo
+          );
+
+          if (fs.existsSync(rutaArchivo)) {
+            await fs.promises.unlink(rutaArchivo);
+          }
+        } catch (errorArchivo) {
+          console.error(
+            'Error al eliminar archivo físico de carta de aceptación:',
+            errorArchivo
+          );
+        }
+      }
+
+      return res.status(200).json({
+        message: 'Integrante eliminado correctamente',
+        integrante_eliminado: {
+          id_integrante: integranteIdNumero,
+          trabajo_social_id: trabajoIdNumero,
+          codigo: codigoUniversitario || null,
+        },
+        cartas_aceptacion_eliminadas:
+          archivosCarta.length,
+      });
+    } catch (error) {
+      await t.rollback();
+
+      console.error(
+        'Error al eliminar integrante del grupo:',
+        error
+      );
+
+      return res.status(500).json({
+        message:
+          'Error interno al eliminar integrante del grupo',
+        error: error.message,
+      });
+    }
+  }
+);
+router.delete(
+  '/trabajos-sociales/:trabajoId',
+  authMiddleware,
+  verificarRol('gestor-udh'),
+  async (req, res) => {
+    const transaction = await sequelize.transaction();
+
+    try {
+      const { trabajoId } = req.params;
+
+      const idTrabajo = Number(trabajoId);
+
+      if (
+        !Number.isInteger(idTrabajo) ||
+        idTrabajo <= 0
+      ) {
+        await transaction.rollback();
+
+        return res.status(400).json({
+          message: 'ID de trabajo social inválido',
+        });
+      }
+
+      const trabajo =
+        await TrabajoSocialSeleccionado.findByPk(
+          idTrabajo,
+          {
+            transaction,
+          }
+        );
+
+      if (!trabajo) {
+        await transaction.rollback();
+
+        return res.status(404).json({
+          message: 'Trabajo social no encontrado',
+        });
+      }
+
+      const trabajoPlain = trabajo.get({
+        plain: true,
+      });
+
+      const cartasAceptacion =
+        await CartaAceptacion.findAll({
+          where: {
+            trabajo_id: idTrabajo,
+          },
+
+          attributes: [
+            'id',
+            'codigo_universitario',
+            'nombre_archivo_pdf',
+          ],
+
+          transaction,
+        });
+
+      const archivosCartas =
+        cartasAceptacion
+          .map((carta) => {
+            const cartaPlain = carta.get({
+              plain: true,
+            });
+
+            return cartaPlain.nombre_archivo_pdf;
+          })
+          .filter(Boolean);
+
+      if (trabajoPlain.carta_aceptacion_pdf) {
+        archivosCartas.push(
+          trabajoPlain.carta_aceptacion_pdf
+        );
+      }
+
+      const archivosCartasUnicos = [
+        ...new Set(archivosCartas),
+      ];
+
+      const actividadesEliminadas =
+        await CronogramaActividades.destroy({
+          where: {
+            trabajo_social_id: idTrabajo,
+          },
+
+          transaction,
+        });
+
+      const cartasEliminadas =
+        await CartaAceptacion.destroy({
+          where: {
+            trabajo_id: idTrabajo,
+          },
+
+          transaction,
+        });
+
+      const integrantesEliminados =
+        await IntegranteGrupo.destroy({
+          where: {
+            trabajo_social_id: idTrabajo,
+          },
+
+          transaction,
+        });
+
+      await trabajo.destroy({
+        transaction,
+      });
+
+      await transaction.commit();
+
+      let archivosFisicosEliminados = 0;
+
+      const archivosNoEliminados = [];
+
+      for (
+        const nombreArchivo
+        of archivosCartasUnicos
+      ) {
+        try {
+          const rutaArchivo = path.join(
+            __dirname,
+            '..',
+            'uploads',
+            'cartas_aceptacion',
+            nombreArchivo
+          );
+
+          if (fs.existsSync(rutaArchivo)) {
+            await fs.promises.unlink(
+              rutaArchivo
+            );
+
+            archivosFisicosEliminados++;
+          }
+        } catch (errorArchivo) {
+          console.error(
+            `Error al eliminar la carta ${nombreArchivo}:`,
+            errorArchivo
+          );
+
+          archivosNoEliminados.push(
+            nombreArchivo
+          );
+        }
+      }
+
+
+      return res.status(200).json({
+        message:
+          'Trabajo social eliminado correctamente',
+
+        trabajo_eliminado: {
+          id: idTrabajo,
+
+          tipo_servicio_social:
+            trabajoPlain.tipo_servicio_social,
+        },
+
+        registros_eliminados: {
+          integrantes:
+            integrantesEliminados,
+
+          cartas_aceptacion:
+            cartasEliminadas,
+
+          actividades:
+            actividadesEliminadas,
+        },
+
+        archivos: {
+          cartas_eliminadas:
+            archivosFisicosEliminados,
+
+          no_eliminados:
+            archivosNoEliminados,
+        },
+      });
+    } catch (error) {
+
+      if (!transaction.finished) {
+        await transaction.rollback();
+      }
+
+      console.error(
+        'Error al eliminar trabajo social:',
+        error
+      );
+
+      return res.status(500).json({
+        message:
+          'Error interno al eliminar el trabajo social',
+
+        error:
+          error.message,
+      });
+    }
+  }
+);
+
 
 module.exports = router;

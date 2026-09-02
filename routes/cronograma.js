@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const upload = require('../middlewares/multerConfig');
-const { CronogramaActividad, TrabajoSocialSeleccionado } = require('../models');
+const { CronogramaActividad, TrabajoSocialSeleccionado, Estudiantes } = require('../models');
 const authMiddleware = require('../middlewares/authMiddleware');
 const path = require('path');
 const fs = require('fs');
@@ -739,6 +739,695 @@ router.patch(
 
       return res.status(500).json({
         message: 'Error al habilitar la corrección'
+      });
+    }
+  }
+);
+
+router.get(
+  '/trabajo/:trabajo_social_id/proceso',
+  authMiddleware,
+  verificarRol(
+    'alumno',
+    'docente supervisor',
+    'gestor-udh',
+    'programa-academico'
+  ),
+  async (req, res) => {
+    try {
+      const { trabajo_social_id } = req.params;
+
+      const trabajoId = Number(
+        trabajo_social_id
+      );
+
+      // ==========================================
+      // VALIDAR ID
+      // ==========================================
+      if (
+        !Number.isInteger(trabajoId) ||
+        trabajoId <= 0
+      ) {
+        return res.status(400).json({
+          message:
+            'ID de trabajo social inválido',
+        });
+      }
+
+      // ==========================================
+      // OBTENER TRABAJO SOCIAL
+      // ==========================================
+      const trabajo =
+        await TrabajoSocialSeleccionado.findByPk(
+          trabajoId,
+          {
+            attributes: [
+              'id',
+              'usuario_id',
+              'tipo_servicio_social',
+              'createdAt',
+            ],
+
+            include: [
+              {
+                model: Estudiantes,
+
+                attributes: [
+                  'nombre_estudiante',
+                ],
+
+                required: false,
+              },
+            ],
+          }
+        );
+
+      if (!trabajo) {
+        return res.status(404).json({
+          message:
+            'Trabajo social no encontrado',
+        });
+      }
+
+      const trabajoPlain =
+        trabajo.get({
+          plain: true,
+        });
+
+      // ==========================================
+      // OBTENER ACTIVIDADES
+      // ==========================================
+      const actividades =
+        await CronogramaActividad.findAll({
+          where: {
+            trabajo_social_id:
+              trabajoId,
+          },
+
+          attributes: [
+            'id',
+            'trabajo_social_id',
+            'actividad',
+            'justificacion',
+            'fecha',
+            'fecha_fin',
+            'resultados',
+            'observacion',
+            'estado',
+            'fecha_fin_primero',
+            'fecha_observacion',
+            'fecha_limite_reenvio',
+            'correccion_habilitada',
+            'evidencia',
+            'createdAt',
+            'updatedAt',
+          ],
+
+          order: [
+            ['fecha', 'ASC'],
+            ['id', 'ASC'],
+          ],
+        });
+
+      // ==========================================
+      // FECHA ACTUAL
+      // ==========================================
+      const ahora = new Date();
+
+      // ==========================================
+      // OBTENER YYYY-MM-DD DE CUALQUIER FECHA
+      // ==========================================
+      const obtenerFechaCalendario = (
+        valor
+      ) => {
+        if (!valor) {
+          return null;
+        }
+
+        // Si Sequelize devuelve string
+        if (typeof valor === 'string') {
+          const coincidencia =
+            valor.match(
+              /^(\d{4})-(\d{2})-(\d{2})/
+            );
+
+          if (coincidencia) {
+            return `${coincidencia[1]}-${coincidencia[2]}-${coincidencia[3]}`;
+          }
+        }
+
+        // Si Sequelize devuelve Date
+        const fecha = new Date(valor);
+
+        if (
+          Number.isNaN(
+            fecha.getTime()
+          )
+        ) {
+          return null;
+        }
+
+        return fecha
+          .toISOString()
+          .slice(0, 10);
+      };
+
+      // ==========================================
+      // SUMAR / RESTAR DÍAS SIN PROBLEMAS
+      // DE ZONA HORARIA
+      // ==========================================
+      const sumarDiasCalendario = (
+        fechaTexto,
+        dias
+      ) => {
+        if (!fechaTexto) {
+          return null;
+        }
+
+        const partes =
+          fechaTexto
+            .split('-')
+            .map(Number);
+
+        if (partes.length !== 3) {
+          return null;
+        }
+
+        const [
+          anio,
+          mes,
+          dia,
+        ] = partes;
+
+        const fechaUTC =
+          new Date(
+            Date.UTC(
+              anio,
+              mes - 1,
+              dia + dias,
+              12,
+              0,
+              0,
+              0
+            )
+          );
+
+        if (
+          Number.isNaN(
+            fechaUTC.getTime()
+          )
+        ) {
+          return null;
+        }
+
+        return fechaUTC
+          .toISOString()
+          .slice(0, 10);
+      };
+
+      // ==========================================
+      // CREAR FECHA EN HORARIO DE PERÚ
+      // PERÚ = UTC-5
+      //
+      // Ejemplo:
+      // 29/06/2026 23:59:59 Perú
+      // =
+      // 30/06/2026 04:59:59 UTC
+      // ==========================================
+      const crearFechaPeru = (
+        fechaTexto,
+        hora = 0,
+        minuto = 0,
+        segundo = 0,
+        milisegundo = 0
+      ) => {
+        if (!fechaTexto) {
+          return null;
+        }
+
+        const partes =
+          fechaTexto
+            .split('-')
+            .map(Number);
+
+        if (partes.length !== 3) {
+          return null;
+        }
+
+        const [
+          anio,
+          mes,
+          dia,
+        ] = partes;
+
+        // Perú está 5 horas detrás de UTC.
+        const fecha =
+          new Date(
+            Date.UTC(
+              anio,
+              mes - 1,
+              dia,
+              hora + 5,
+              minuto,
+              segundo,
+              milisegundo
+            )
+          );
+
+        if (
+          Number.isNaN(
+            fecha.getTime()
+          )
+        ) {
+          return null;
+        }
+
+        return fecha;
+      };
+
+      // ==========================================
+      // PROCESAR CRONOGRAMA
+      // ==========================================
+      const cronograma =
+        actividades.map(
+          (actividad) => {
+            const item =
+              actividad.get({
+                plain: true,
+              });
+
+            let fechaInicioPermitida =
+              null;
+
+            let fechaLimite =
+              null;
+
+            let tipoPlazo =
+              'normal';
+
+            let fechaLimiteCalendario =
+              null;
+
+            // ======================================
+            // CASO 1:
+            // EVIDENCIA OBSERVADA CON REENVÍO
+            // ======================================
+            if (
+              item.estado ===
+                'observado' &&
+              item.correccion_habilitada ===
+                true &&
+              item.fecha_limite_reenvio
+            ) {
+              tipoPlazo =
+                'reenvio';
+
+              // El reenvío empieza desde
+              // la fecha de observación.
+              if (
+                item.fecha_observacion
+              ) {
+                const inicioReenvio =
+                  new Date(
+                    item.fecha_observacion
+                  );
+
+                if (
+                  !Number.isNaN(
+                    inicioReenvio.getTime()
+                  )
+                ) {
+                  fechaInicioPermitida =
+                    inicioReenvio;
+                }
+              }
+
+              // La fecha límite del reenvío
+              // ya viene definida desde BD.
+              const limiteReenvio =
+                new Date(
+                  item.fecha_limite_reenvio
+                );
+
+              if (
+                !Number.isNaN(
+                  limiteReenvio.getTime()
+                )
+              ) {
+                fechaLimite =
+                  limiteReenvio;
+              }
+            }
+
+            // ======================================
+            // CASO 2:
+            // PLAZO NORMAL
+            // ======================================
+            else if (
+              item.fecha_fin_primero
+            ) {
+              const fechaBaseCalendario =
+                obtenerFechaCalendario(
+                  item.fecha_fin_primero
+                );
+
+              if (
+                fechaBaseCalendario
+              ) {
+                // ----------------------------------
+                // Se habilita 5 días antes
+                // ----------------------------------
+                const inicioCalendario =
+                  sumarDiasCalendario(
+                    fechaBaseCalendario,
+                    -5
+                  );
+
+                // ----------------------------------
+                // Vence 10 días después
+                // ----------------------------------
+                fechaLimiteCalendario =
+                  sumarDiasCalendario(
+                    fechaBaseCalendario,
+                    10
+                  );
+
+                // Inicio permitido:
+                // 00:00:00 hora Perú
+                fechaInicioPermitida =
+                  crearFechaPeru(
+                    inicioCalendario,
+                    0,
+                    0,
+                    0,
+                    0
+                  );
+
+                // Fecha límite:
+                // 23:59:59.999 hora Perú
+                fechaLimite =
+                  crearFechaPeru(
+                    fechaLimiteCalendario,
+                    23,
+                    59,
+                    59,
+                    999
+                  );
+              }
+            }
+
+            // ==========================================
+            // ESTADO DEL PLAZO
+            // ==========================================
+            let estadoPlazo =
+              'sin_fecha';
+
+            const fechasValidas =
+              fechaInicioPermitida &&
+              fechaLimite &&
+              !Number.isNaN(
+                fechaInicioPermitida.getTime()
+              ) &&
+              !Number.isNaN(
+                fechaLimite.getTime()
+              );
+
+            if (fechasValidas) {
+              // ======================================
+              // REENVÍO
+              // ======================================
+              if (
+                tipoPlazo ===
+                'reenvio'
+              ) {
+                /*
+                  Mientras siga en estado "observado"
+                  y corrección habilitada, significa
+                  que todavía está pendiente el reenvío.
+
+                  En este caso SÍ debemos evaluar
+                  la fecha actual, aunque exista una
+                  evidencia anterior, porque esa
+                  evidencia es precisamente la que
+                  fue observada.
+                */
+
+                if (
+                  ahora <
+                  fechaInicioPermitida
+                ) {
+                  estadoPlazo =
+                    'aun_no_habilitado';
+                } else if (
+                  ahora >
+                  fechaLimite
+                ) {
+                  estadoPlazo =
+                    'vencido';
+                } else {
+                  estadoPlazo =
+                    'a_tiempo';
+                }
+              }
+
+              // ======================================
+              // PLAZO NORMAL
+              // ======================================
+              else {
+                /*
+                  Si YA existe evidencia, utilizamos
+                  fecha_fin porque este campo guarda
+                  la fecha real en que el estudiante
+                  realizó el envío.
+                */
+                if (item.evidencia) {
+                  const fechaEnvioCalendario =
+                    obtenerFechaCalendario(
+                      item.fecha_fin
+                    );
+
+                  /*
+                    Si existe fecha_fin, comprobamos
+                    que el envío haya ocurrido hasta
+                    la fecha límite.
+
+                    Como el sistema normalmente no
+                    permite enviar después del límite,
+                    esto debería dar "a_tiempo".
+                  */
+                  if (
+                    fechaEnvioCalendario &&
+                    fechaLimiteCalendario
+                  ) {
+                    if (
+                      fechaEnvioCalendario <=
+                      fechaLimiteCalendario
+                    ) {
+                      estadoPlazo =
+                        'a_tiempo';
+                    } else {
+                      estadoPlazo =
+                        'vencido';
+                    }
+                  }
+
+                  /*
+                    Si existe evidencia pero por algún
+                    registro antiguo fecha_fin está null,
+                    asumimos que el envío fue realizado.
+                  */
+                  else {
+                    estadoPlazo =
+                      'a_tiempo';
+                  }
+                }
+
+                // ==================================
+                // NO EXISTE EVIDENCIA
+                // ==================================
+                else if (
+                  ahora <
+                  fechaInicioPermitida
+                ) {
+                  estadoPlazo =
+                    'aun_no_habilitado';
+                }
+
+                else if (
+                  ahora >
+                  fechaLimite
+                ) {
+                  estadoPlazo =
+                    'vencido';
+                }
+
+                else {
+                  estadoPlazo =
+                    'a_tiempo';
+                }
+              }
+            }
+
+            // ==========================================
+            // ESTADO DE LA EVIDENCIA
+            // ==========================================
+            let estadoEvidencia =
+              'no_enviado';
+
+            if (item.evidencia) {
+              switch (
+                item.estado
+              ) {
+                case 'aprobado':
+                  estadoEvidencia =
+                    'aceptado';
+                  break;
+
+                case 'observado':
+                  estadoEvidencia =
+                    'observado';
+                  break;
+
+                case 'pendiente':
+                  estadoEvidencia =
+                    'pendiente';
+                  break;
+
+                default:
+                  estadoEvidencia =
+                    'pendiente';
+                  break;
+              }
+            }
+
+            // ==========================================
+            // RESPUESTA DE CADA ACTIVIDAD
+            // ==========================================
+            return {
+              id:
+                item.id,
+
+              trabajo_social_id:
+                item.trabajo_social_id,
+
+              actividad:
+                item.actividad,
+
+              justificacion:
+                item.justificacion,
+
+              fecha:
+                item.fecha,
+
+              // Fecha real en que envió evidencia
+              fecha_fin:
+                item.fecha_fin,
+
+              // Fecha base del plazo
+              fecha_fin_primero:
+                item.fecha_fin_primero,
+
+              resultados:
+                item.resultados,
+
+              observacion:
+                item.observacion,
+
+              evidencia:
+                item.evidencia,
+
+              estado:
+                item.estado,
+
+              correccion_habilitada:
+                item.correccion_habilitada,
+
+              fecha_observacion:
+                item.fecha_observacion,
+
+              fecha_limite_reenvio:
+                item.fecha_limite_reenvio,
+
+              createdAt:
+                item.createdAt,
+
+              updatedAt:
+                item.updatedAt,
+
+              // ======================================
+              // CAMPOS CALCULADOS
+              // ======================================
+              tipo_plazo:
+                tipoPlazo,
+
+              fecha_inicio_permitida:
+                fechaInicioPermitida &&
+                !Number.isNaN(
+                  fechaInicioPermitida.getTime()
+                )
+                  ? fechaInicioPermitida.toISOString()
+                  : null,
+
+              fecha_limite_actual:
+                fechaLimite &&
+                !Number.isNaN(
+                  fechaLimite.getTime()
+                )
+                  ? fechaLimite.toISOString()
+                  : null,
+
+              estado_plazo:
+                estadoPlazo,
+
+              estado_evidencia:
+                estadoEvidencia,
+            };
+          }
+        );
+
+      // ==========================================
+      // RESPUESTA FINAL
+      // ==========================================
+      return res.status(200).json({
+        trabajo: {
+          id:
+            trabajoPlain.id,
+
+          usuario_id:
+            trabajoPlain.usuario_id,
+
+          tipo_servicio_social:
+            trabajoPlain.tipo_servicio_social,
+
+          createdAt:
+            trabajoPlain.createdAt,
+
+          estudiante: {
+            nombre_estudiante:
+              trabajoPlain.Estudiante
+                ?.nombre_estudiante ||
+              null,
+          },
+        },
+
+        total_actividades:
+          cronograma.length,
+
+        actividades:
+          cronograma,
+      });
+    } catch (error) {
+      console.error(
+        'Error al obtener proceso del cronograma:',
+        error
+      );
+
+      return res.status(500).json({
+        message:
+          'Error interno al obtener el proceso del cronograma',
+
+        error:
+          error.message,
       });
     }
   }

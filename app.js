@@ -24,6 +24,7 @@ const IntegranteGrupo = require('./models/IntegranteGrupo');
 const Facultades = require('./models/Facultades');
 const SystemConfig = require('./models/SystemConfig');
 const Contactos = require('./models/Contactos');
+const DocumentoOficial = require('./models/DocumentoOficial');
 
 const app = express();
 
@@ -81,6 +82,7 @@ app.use('/api/labores', require('./routes/laboresSociales'));
 app.use('/api/estudiantes', require('./routes/estudiantes'));
 app.use('/api/trabajo-social', require('./routes/trabajoSocialSeleccionadoRoutes'));
 app.use('/api/contactos', require('./routes/contactos'));
+app.use('/api/documentos-oficiales',require('./routes/documentosOficiales'));
 
 const startServer = async () => {
   try {
@@ -90,6 +92,7 @@ const startServer = async () => {
     await Roles.sync();
     await TrabajoSocialSeleccionado.sync();
     await Usuario.sync();
+    await DocumentoOficial.sync();
     await SystemConfig.sync();
     await Notificacion.sync();
     await ProgramasAcademicos.sync();

@@ -14,7 +14,7 @@ const Estudiantes = require('./Estudiantes');
 const CronogramaActividad = require('./CronogramaActividad');
 const IntegranteGrupo = require('./IntegranteGrupo'); 
 const ObservacionTrabajoSocial = require('./ObservacionTrabajoSocial');
-
+const DocumentoOficial = require('./DocumentoOficial');
 
 Roles.hasMany(Usuario, { foreignKey: 'rol_id' });
 Usuario.belongsTo(Roles, { foreignKey: 'rol_id' });
@@ -145,6 +145,16 @@ Usuario.hasMany(ObservacionTrabajoSocial, {
   as: 'observaciones'
 });
 
+Usuario.hasMany(DocumentoOficial, {
+	foreignKey: 'usuario_carga_id',
+	as: 'documentosCargados'
+});
+
+DocumentoOficial.belongsTo(Usuario, {
+	foreignKey: 'usuario_carga_id',
+	as: 'usuarioCarga'
+});
+
 ObservacionTrabajoSocial.belongsTo(Usuario, {
   foreignKey: 'usuario_id',
   as: 'autor'
@@ -168,5 +178,6 @@ module.exports = {
   CartaAceptacion,
   CartaTermino,
   ObservacionTrabajoSocial,
-  CertificadoFinalMiembro
+  CertificadoFinalMiembro,
+  DocumentoOficial
 };
