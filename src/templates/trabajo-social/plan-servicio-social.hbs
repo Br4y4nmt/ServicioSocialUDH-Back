@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Plan de Servicio Social UDH</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 20mm;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "Times New Roman", Times, serif;
+      font-size: 12pt;
+      color: #000;
+      line-height: 1.5;
+    }
+
+    .page {
+      width: 100%;
+    }
+
+    .page-break {
+      break-after: page;
+      page-break-after: always;
+    }
+
+    .cover {
+      min-height: 255mm;
+      position: relative;
+      text-align: center;
+    }
+
+    .university {
+      font-size: 12pt;
+      margin-bottom: 6px;
+    }
+
+    .faculty,
+    .program {
+      font-size: 14pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .logo-container {
+      margin: 20px 0 15px;
+      text-align: center;
+    }
+
+    .logo {
+      width: 90mm;
+      height: auto;
+      max-height: 60mm;
+      object-fit: contain;
+    }
+
+    .plan-title {
+      margin-top: 10px;
+      font-size: 16pt;
+      font-weight: bold;
+    }
+
+    .service-title {
+      width: 80%;
+      margin: 8px auto 22px;
+      padding: 6px 0;
+      border-top: 1px solid #000;
+      border-bottom: 1px solid #000;
+      font-size: 14pt;
+      font-weight: bold;
+      font-style: italic;
+    }
+
+    .cover-data {
+      width: 90%;
+      margin: 0 auto;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    .cover-data td {
+      padding: 5px 4px;
+      vertical-align: top;
+    }
+
+    .cover-data .label {
+      width: 38%;
+      font-weight: bold;
+    }
+
+    .cover-footer {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 5mm;
+      text-align: center;
+    }
+
+    .section-title {
+      font-size: 14pt;
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .section-heading {
+      font-size: 12pt;
+      font-weight: bold;
+      margin: 18px 0 8px;
+    }
+
+    .subsection-heading {
+      font-weight: bold;
+      margin: 14px 0 6px 5mm;
+    }
+
+    .paragraph {
+      margin: 0 0 10px;
+      text-align: justify;
+      white-space: pre-line;
+    }
+
+    .subsection-content {
+      margin-left: 5mm;
+    }
+  </style>
+</head>
+<body>
+  <section class="page cover page-break">
+    <div class="university">UNIVERSIDAD DE HUÁNUCO</div>
+    <div class="faculty">FACULTAD DE {{nombreFacultad}}</div>
+    <div class="program">PROGRAMA ACADÉMICO DE {{nombrePrograma}}</div>
+
+    <div class="logo-container">
+      <img class="logo" src="{{logoDataUri}}" alt="Universidad de Huánuco">
+    </div>
+
+    <div class="plan-title">PLAN SERVICIO SOCIAL UDH</div>
+    <div class="service-title">"{{nombreLaborSocial}}"</div>
+
+    <table class="cover-data">
+      <tbody>
+        <tr>
+          <td class="label">Nombre Completo:</td>
+          <td>{{nombreCompleto}}</td>
+        </tr>
+        <tr>
+          <td class="label">Código Universitario:</td>
+          <td>{{codigoUniversitario}}</td>
+        </tr>
+        <tr>
+          <td class="label">Nombre de la Institución:</td>
+          <td>{{nombreInstitucion}}</td>
+        </tr>
+        <tr>
+          <td class="label">Responsable Institucional:</td>
+          <td>{{nombreResponsable}}</td>
+        </tr>
+        <tr>
+          <td class="label">Línea de Acción:</td>
+          <td>{{lineaAccion}}</td>
+        </tr>
+        <tr>
+          <td class="label">Fecha de Presentación:</td>
+          <td>{{fechaPresentacion}}</td>
+        </tr>
+        <tr>
+          <td class="label">Periodo Estimado:</td>
+          <td>{{periodoEstimado}}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="cover-footer">
+      <div>HUÁNUCO - PERÚ</div>
+      <div>{{anio}}</div>
+    </div>
+  </section>
+
+  <section class="page page-break">
+    <h1 class="section-title">INTRODUCCIÓN</h1>
+    <p class="paragraph">{{introduccion}}</p>
+  </section>
+
+  <section class="page">
+    <div class="section-heading">1. JUSTIFICACIÓN</div>
+    <p class="paragraph">{{justificacion}}</p>
+
+    <div class="section-heading">2. OBJETIVOS</div>
+
+    <div class="subsection-heading">2.1 OBJETIVO GENERAL:</div>
+    <div class="subsection-content">
+      <p class="paragraph">{{objetivoGeneral}}</p>
+    </div>
+
+    <div class="subsection-heading">2.2 OBJETIVOS ESPECÍFICOS:</div>
+    <div class="subsection-content">
+      <p class="paragraph">{{objetivosEspecificos}}</p>
+    </div>
+
+    <div class="section-heading">3. MARCO INSTITUCIONAL</div>
+
+    <div class="subsection-heading">3.1 NOMBRE DE LA ENTIDAD:</div>
+    <div class="subsection-content">
+      <p class="paragraph">{{nombreEntidad}}</p>
+    </div>
+
+    <div class="subsection-heading">3.2 MISIÓN Y VISIÓN:</div>
+    <div class="subsection-content">
+      <p class="paragraph">{{misionVision}}</p>
+    </div>
+
+    <div class="subsection-heading">3.3 SERVICIOS:</div>
+    <div class="subsection-content">
+      <p class="paragraph">{{areasIntervencion}}</p>
+    </div>
+
+    <div class="subsection-heading">3.4 ÁREAS DE INTERVENCIÓN O SERVICIOS QUE OFRECE:</div>
+    <div class="subsection-content">
+      <p class="paragraph">{{areasIntervencion}}</p>
+    </div>
+
+    <div class="subsection-heading">3.5 UBICACIÓN Y POBLACIÓN:</div>
+    <div class="subsection-content">
+      <p class="paragraph">{{ubicacionPoblacion}}</p>
+    </div>
+
+    <div class="section-heading">4. ÁREA DE INFLUENCIA</div>
+    <p class="paragraph">{{areaInfluencia}}</p>
+
+    <div class="section-heading">5. METODOLOGÍA DE INTERVENCIÓN</div>
+    <p class="paragraph">{{metodologiaIntervencion}}</p>
+
+    <div class="section-heading">6. RECURSOS REQUERIDOS</div>
+    <p class="paragraph">{{recursosRequeridos}}</p>
+
+    <div class="section-heading">7. RESULTADOS ESPERADOS</div>
+    <p class="paragraph">{{resultadosEsperados}}</p>
+  </section>
+</body>
+</html>

@@ -3,7 +3,6 @@
   const verificarRol = require('../middlewares/verificarRol');
   const router = express.Router();
   const multer = require('multer');
-  const PDFDocument = require('pdfkit');
   const fs = require('fs');
   const path = require('path');
   const sequelize = require('../config/database');
@@ -42,45 +41,7 @@
     }
   });
 
-  const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-      cb(null, 'uploads/cartas_aceptacion'); 
-    },
-    filename: function (req, file, cb) {
-      const uniqueName = Date.now() + '-' + file.originalname;
-      cb(null, uniqueName);
-    }
-  });
 
-  const upload = multer({
-    storage: storage,
-    fileFilter: function (req, file, cb) {
-      const ext = path.extname(file.originalname);
-      if (ext !== '.pdf') {
-        return cb(new Error('Solo se permiten archivos PDF'));
-      }
-      cb(null, true);
-    }
-  });
-  const storageArchivoPlan = multer.diskStorage({
-      destination: function (req, file, cb) {
-        cb(null, 'uploads/planes_labor_social');
-      },
-      filename: function (req, file, cb) {
-        const uniqueName = Date.now() + '-' + file.originalname;
-        cb(null, uniqueName);
-      }
-    });
-    const uploadArchivoPlan = multer({
-      storage: storageArchivoPlan,
-      fileFilter: function (req, file, cb) {
-        const ext = path.extname(file.originalname);
-        if (ext !== '.pdf') {
-          return cb(new Error('Solo se permiten archivos PDF'));
-        }
-        cb(null, true);
-      }
-    });
   const storageCartaTermino = multer.diskStorage({
     destination: function (req, file, cb) {
       const dir = path.join(__dirname, '../uploads/cartas_termino');
@@ -1540,7 +1501,7 @@ router.patch(
 
         const debeEliminarIntegrantes =
           trabajoSocial.tipo_servicio_social === 'grupal' &&
-          (estado_plan_labor_social === 'rechazado' || conformidad_plan_social === 'rechazado');
+          estado_plan_labor_social === 'rechazado';
 
         if (debeEliminarIntegrantes) {
           await IntegranteGrupo.destroy({
@@ -1582,103 +1543,6 @@ router.patch(
         res.status(500).json({ message: 'Error interno al actualizar el trabajo social.', error });
       }
     });
-
-  router.post('/generar-pdf/:id',
-    authMiddleware,
-    verificarRol('docente supervisor'),
-    async (req, res) => {
-    try {
-      const { id } = req.params;
-
-      const trabajo = await TrabajoSocialSeleccionado.findByPk(id, {
-        include: [
-          { model: Estudiantes, attributes: ['nombre_estudiante'] },
-          { model: LaboresSociales, attributes: ['nombre_labores'] },
-          { model: ProgramasAcademicos, attributes: ['nombre_programa'] },
-        ]
-      });
-
-      if (!trabajo) {
-        return res.status(404).json({ message: 'Trabajo social no encontrado' });
-      }
-
-      const nombreArchivo = `carta_aceptacion_${trabajo.id}_${Date.now()}.pdf`;
-      const rutaArchivo = path.join(__dirname, '../uploads/planes_labor_social', nombreArchivo);
-      const doc = new PDFDocument();
-      doc.pipe(fs.createWriteStream(rutaArchivo));
-
-      doc.fontSize(18).text('Carta de Aceptación del Plan de Trabajo Social', { align: 'center' });
-      doc.moveDown();
-      doc.fontSize(12).text(`Nombre del estudiante: ${trabajo.Estudiante?.nombre_estudiante || 'No registrado'}`);
-      doc.text(`Programa académico: ${trabajo.ProgramasAcademico?.nombre_programa || 'N/A'}`);
-      doc.text(`Labor social: ${trabajo.LaboresSociale?.nombre_labores || 'N/A'}`);
-      doc.text(`Fecha de aceptación: ${new Date().toLocaleDateString()}`);
-      doc.end();
-      await trabajo.update({ carta_aceptacion_pdf: nombreArchivo });
-
-      res.status(200).json({
-        message: 'Carta de aceptación generada correctamente',
-        archivo: nombreArchivo
-      });
-
-    } catch (error) {
-      console.error('Error al generar el PDF:', error);
-      res.status(500).json({ message: 'Error al generar PDF', error });
-    }
-  });
-
-  router.get('/pdf/:id', async (req, res) => {
-    try {
-      const { id } = req.params;
-
-      const trabajo = await TrabajoSocialSeleccionado.findByPk(id);
-
-      if (!trabajo || !trabajo.carta_aceptacion_pdf) {
-        return res.status(404).json({ message: 'Archivo no encontrado para este trabajo social' });
-      }
-
-      const rutaPDF = path.join(__dirname, '../uploads/planes_labor_social', trabajo.carta_aceptacion_pdf);
-      if (!fs.existsSync(rutaPDF)) {
-        return res.status(404).json({ message: 'Archivo PDF no existe en el servidor' });
-      }
-      res.sendFile(rutaPDF);
-    } catch (error) {
-      console.error('Error al servir el PDF:', error);
-      res.status(500).json({ message: 'Error interno al servir PDF', error });
-    }
-  });
-
-  router.post('/guardar-pdf-html',
-    authMiddleware,
-    verificarRol('docente supervisor'),
-    upload.single('archivo'),
-    async (req, res) => {
-    try {
-      const { trabajo_id } = req.body;
-
-      if (!trabajo_id || !req.file) {
-        return res.status(400).json({ message: 'ID de trabajo o archivo faltante' });
-      }
-
-      const trabajo = await TrabajoSocialSeleccionado.findByPk(trabajo_id);
-
-      if (!trabajo) {
-        return res.status(404).json({ message: 'Trabajo social no encontrado' });
-      }
-      await trabajo.update({
-        carta_aceptacion_pdf: req.file.filename
-      });
-
-      res.status(200).json({
-        message: 'PDF guardado correctamente',
-        archivo: req.file.filename
-      });
-
-    } catch (error) {
-      console.error('Error al guardar el PDF desde el frontend:', error);
-      res.status(500).json({ message: 'Error al guardar el PDF', error });
-    }
-  });
 
 
   router.get('/certificado-final/:trabajo_id', async (req, res) => {
@@ -1743,153 +1607,6 @@ router.patch(
       res.status(500).json({ message: 'Error interno', error });
     }
   });
-
-
- router.post(
-  '/subir-plan-social',
-  authMiddleware,
-  verificarRol('alumno'),
-  uploadArchivoPlan.single('archivo_plan_social'),
-  async (req, res) => {
-    try {
-      const { usuario_id } = req.body;
-      const archivo = req.file?.filename;
-
-      if (!usuario_id || !archivo) {
-        return res.status(400).json({ message: 'Datos incompletos' });
-      }
-
-      const trabajo = await TrabajoSocialSeleccionado.findOne({
-        where: { usuario_id }
-      });
-
-      if (!trabajo) {
-        if (archivo) {
-          const rutaArchivo = path.join(
-            __dirname,
-            '..',
-            'uploads',
-            'planes_labor_social',
-            archivo
-          );
-
-          if (fs.existsSync(rutaArchivo)) {
-            await fs.promises.unlink(rutaArchivo);
-          }
-        }
-
-        return res.status(404).json({
-          message: 'No se encontró trabajo social con ese usuario_id'
-        });
-      }
-
-      const config = await SystemConfig.findByPk(1);
-
-      if (!config) {
-        if (archivo) {
-          const rutaArchivo = path.join(
-            __dirname,
-            '..',
-            'uploads',
-            'planes_labor_social',
-            archivo
-          );
-
-          if (fs.existsSync(rutaArchivo)) {
-            await fs.promises.unlink(rutaArchivo);
-          }
-        }
-
-        return res.status(500).json({
-          message: 'Configuración del sistema no encontrada'
-        });
-      }
-
-      if (
-        Number(config.inicio_servicio_social_habilitado) !== 1 &&
-        !trabajo.archivo_plan_social
-      ) {
-        const rutaArchivo = path.join(
-          __dirname,
-          '..',
-          'uploads',
-          'planes_labor_social',
-          archivo
-        );
-
-        try {
-          if (fs.existsSync(rutaArchivo)) {
-            await fs.promises.unlink(rutaArchivo);
-          }
-        } catch (error) {
-          console.error('⚠️ Error al eliminar archivo bloqueado:', error);
-        }
-
-        return res.status(403).json({
-          message: 'La subida del plan social está deshabilitada actualmente'
-        });
-      }
-
-      if (!trabajo.carta_aceptacion_pdf || trabajo.estado_plan_labor_social !== 'aceptado') {
-        const rutaArchivo = path.join(
-          __dirname,
-          '..',
-          'uploads',
-          'planes_labor_social',
-          archivo
-        );
-
-        try {
-          if (fs.existsSync(rutaArchivo)) {
-            await fs.promises.unlink(rutaArchivo);
-          }
-        } catch (error) {
-          console.error('⚠️ Error al eliminar archivo no permitido:', error);
-        }
-
-        return res.status(400).json({
-          message: 'No puedes subir el plan social. Se requiere carta de aceptación y estado del plan aprobado.'
-        });
-      }
-
-      if (trabajo.archivo_plan_social) {
-        const rutaAnterior = path.join(
-          __dirname,
-          '..',
-          'uploads',
-          'planes_labor_social',
-          trabajo.archivo_plan_social
-        );
-
-        try {
-          if (fs.existsSync(rutaAnterior)) {
-            await fs.promises.unlink(rutaAnterior);
-          }
-        } catch (error) {
-          console.error('⚠️ Error al eliminar archivo anterior:', error);
-        }
-      }
-
-      await trabajo.update({
-        archivo_plan_social: archivo,
-        conformidad_plan_social: 'pendiente'
-      });
-
-      return res.status(200).json({
-        message: 'Archivo subido correctamente y estado actualizado',
-        archivo
-      });
-
-    } catch (error) {
-      console.error('Error al subir el plan social:', error);
-
-      return res.status(500).json({
-        message: 'Error interno al subir archivo',
-        error
-      });
-    }
-  }
-);
 
   router.patch('/:id/solicitar-carta-termino',
     authMiddleware,
@@ -3016,5 +2733,23 @@ router.delete(
   }
 );
 
+router.delete('/seleccionado/:id', authMiddleware, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      const trabajo = await TrabajoSocialSeleccionado.findByPk(id);
+
+      if (!trabajo) {
+        return res.status(404).json({ message: 'No se encontró la elección del trabajo social' });
+      }
+
+      await trabajo.destroy();
+
+      res.status(200).json({ message: 'Elección eliminada correctamente' });
+    } catch (error) {
+      console.error('Error al eliminar elección:', error);
+      res.status(500).json({ message: 'Error al eliminar la elección' });
+    }
+  });
 
 module.exports = router;

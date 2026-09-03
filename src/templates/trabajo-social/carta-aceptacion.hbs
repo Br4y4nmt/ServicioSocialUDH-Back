@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 10mm;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: "Times New Roman", Times, serif;
+      color: #000;
+    }
+
+    body {
+      position: relative;
+      min-height: 277mm;
+    }
+
+    .carta-aceptacion {
+      position: relative;
+      padding: 40px;
+      padding-bottom: 250px;
+      font-family: "Times New Roman", Times, serif;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #000;
+    }
+
+    .carta-firma-docente {
+      margin-top: 12px;
+      font-style: normal;
+    }
+
+    .firma-docente {
+      margin-top: 12px;
+      font-style: normal;
+      font-weight: normal;
+    }
+
+    .carta-cuerpo {
+      margin-top: 70px;
+    }
+
+    .carta-encabezado {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    .carta-logo {
+      width: 160px;
+      height: auto;
+    }
+
+    .carta-institucion {
+      flex: 1;
+      text-align: center;
+      font-size: 12pt;
+      font-weight: bold;
+    }
+
+    .carta-institucion p {
+      margin: 0;
+    }
+
+    .carta-fecha {
+      text-align: right;
+      margin-top: 10px;
+      font-size: 15px;
+    }
+
+    .separador-vertical {
+      width: 1px;
+      min-width: 1px;
+      background-color: #585757;
+      height: 60px;
+      margin: 0 20px;
+    }
+
+    .carta-asunto {
+      font-weight: bold;
+      margin-top: 15px;
+      font-size: 17px;
+    }
+
+    .asunto-label {
+      display: inline-block;
+      width: 120px;
+    }
+
+    .estudiante-label {
+      display: inline-block;
+      width: 150px;
+    }
+
+    .carta-body {
+      text-align: justify;
+      margin-top: 10px;
+      margin-bottom: 10px;
+      font-size: 15px;
+    }
+
+    .carta-body-indentada {
+      text-indent: 40px;
+    }
+
+    .carta-footer {
+      text-align: center;
+      margin-top: 40px;
+    }
+
+    .carta-atentamente {
+      margin-top: 100px;
+    }
+
+    .firma-imagen {
+      width: 150px;
+      max-height: 100px;
+      object-fit: contain;
+      margin-top: 10px;
+    }
+
+    .qr-anchor {
+      position: absolute;
+      left: 30px;
+      bottom: 5px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      z-index: 10;
+      page-break-inside: avoid;
+    }
+
+    .qr-anchor img {
+      width: 70px;
+      height: 70px;
+    }
+
+    .qr-anchor .qr-text {
+      font-size: 10px;
+      line-height: 1.2;
+      max-width: 300px;
+      margin-top: 0;
+    }
+
+    hr {
+      border: 0;
+      border-top: 1px solid #585757;
+      margin: 0;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 20px;
+      margin: 20px 0;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="carta-aceptacion">
+
+    <div class="carta-encabezado">
+
+      <img
+        src="{{logoDataUri}}"
+        class="carta-logo"
+        alt="Universidad de Huánuco"
+      />
+
+      <div class="separador-vertical"></div>
+
+      <div class="carta-institucion">
+        <p>
+          FACULTAD DE {{nombreFacultad}}
+        </p>
+      </div>
+
+      <div class="separador-vertical"></div>
+
+      <div class="carta-institucion">
+        <p>
+          P.A. DE {{nombrePrograma}}
+        </p>
+      </div>
+
+    </div>
+
+    <hr />
+
+    <h1>
+      CARTA DE ACEPTACIÓN
+    </h1>
+
+    <p class="carta-fecha">
+      Huánuco, {{fechaExtendida}}
+    </p>
+
+    <div class="carta-cuerpo">
+
+      <p class="carta-asunto">
+        <strong class="asunto-label">
+          ASUNTO:
+        </strong>
+
+        <span>
+          ACEPTACIÓN DE SUPERVISIÓN DE SERVICIO SOCIAL
+        </span>
+      </p>
+
+      <p class="carta-body">
+        De mi consideración:
+      </p>
+
+      <p class="carta-body carta-body-indentada">
+        Tengo el agrado de dirigirme a usted para expresarle un cordial saludo
+        y a la vez comunicarle que he aceptado supervisar el desarrollo de su
+        servicio social a:
+      </p>
+
+      <p class="carta-asunto">
+        <span class="estudiante-label">
+          <strong>ESTUDIANTE:</strong>
+        </span>
+
+        {{nombreEstudiante}}
+      </p>
+
+      <p class="carta-body">
+        Sin otro particular, me despido expresándole mi consideración y estima
+        personal.
+      </p>
+
+      <div class="carta-footer">
+
+        <p class="carta-atentamente">
+          Atentamente,
+        </p>
+
+        <img
+          src="{{firmaDataUri}}"
+          alt="Firma del docente"
+          class="firma-imagen"
+        />
+
+        <p class="carta-firma-docente">
+          {{nombreDocente}}
+        </p>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <div class="qr-anchor">
+
+    <img
+      src="{{qrDataUri}}"
+      alt="Código QR"
+    />
+
+    <div class="qr-text">
+      <strong>Documento:</strong>
+      CARTA DE ACEPTACIÓN
+      <br />
+
+      <strong>URL de Verificación:</strong>
+      <br />
+
+      {{urlVerificacion}}
+    </div>
+
+  </div>
+
+</body>
+</html>

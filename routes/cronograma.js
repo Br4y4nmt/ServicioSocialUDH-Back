@@ -7,25 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const verificarRol = require('../middlewares/verificarRol');
 
-router.get('/:usuario_id',
-  authMiddleware,
-  verificarRol('alumno', 'docente supervisor', 'gestor-udh', 'programa-academico'),
-  async (req, res) => {
-  const { usuario_id } = req.params;
-  try {
-    const trabajo = await TrabajoSocialSeleccionado.findOne({ where: { usuario_id } });
-    if (!trabajo) return res.status(404).json({ message: 'No encontrado' });
 
-    const actividades = await CronogramaActividad.findAll({
-      where: { trabajo_social_id: trabajo.id }
-    });
-
-    res.json(actividades);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Error al obtener cronograma' });
-  }
-});
 
 router.post(
   '/evidencia/:actividad_id',

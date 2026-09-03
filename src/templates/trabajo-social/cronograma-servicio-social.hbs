@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Cronograma de Actividades</title>
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 20mm;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "Times New Roman", Times, serif;
+      font-size: 11pt;
+      color: #000;
+    }
+
+    h1 {
+      margin: 0 0 24px;
+      text-align: center;
+      font-size: 18pt;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    th,
+    td {
+      border: 1px solid #b8b8b8;
+      padding: 8px;
+      vertical-align: middle;
+      word-break: break-word;
+    }
+
+    th {
+      background: #2980b9;
+      color: #fff;
+      font-size: 11pt;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    tbody tr:nth-child(even) {
+      background: #f0f0f0;
+    }
+
+    td {
+      text-align: left;
+      line-height: 1.35;
+    }
+
+    .col-actividad {
+      width: 23%;
+    }
+
+    .col-justificacion {
+      width: 23%;
+    }
+
+    .col-fecha {
+      width: 12%;
+      text-align: center;
+    }
+
+    .col-resultados {
+      width: 30%;
+    }
+
+    tr {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+  </style>
+</head>
+<body>
+  <h1>CRONOGRAMA DE ACTIVIDADES</h1>
+
+  <table>
+    <thead>
+      <tr>
+        <th class="col-actividad">Actividad</th>
+        <th class="col-justificacion">Justificación</th>
+        <th class="col-fecha">Fecha Estimada</th>
+        <th class="col-fecha">Fecha Fin</th>
+        <th class="col-resultados">Resultados Esperados</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each actividades}}
+        <tr>
+          <td>{{actividad}}</td>
+          <td>{{justificacion}}</td>
+          <td class="col-fecha">{{fecha}}</td>
+          <td class="col-fecha">{{fechaFin}}</td>
+          <td>{{resultados}}</td>
+        </tr>
+      {{/each}}
+    </tbody>
+  </table>
+</body>
+</html>

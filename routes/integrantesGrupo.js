@@ -182,6 +182,7 @@ router.post(
   async (req, res) => {
     try {
       const { trabajo_social_id, codigo } = req.body;
+
       const idTrabajo = Number(trabajo_social_id);
       const codigoLimpio = String(codigo || '').trim();
 
@@ -207,17 +208,21 @@ router.post(
 
       const estadoInforme = String(
         trabajo.estado_informe_final || ''
-      ).trim().toLowerCase();
+      )
+        .trim()
+        .toLowerCase();
 
       if (estadoInforme !== 'pendiente') {
         return res.status(409).json({
-          message: 'No se pueden agregar integrantes porque el informe final ya no se encuentra pendiente'
+          message:
+            'No se pueden agregar integrantes porque el informe final ya no se encuentra pendiente'
         });
       }
 
       if (!trabajo.usuario_id) {
         return res.status(422).json({
-          message: 'El trabajo social no tiene un estudiante principal asociado'
+          message:
+            'El trabajo social no tiene un estudiante principal asociado'
         });
       }
 
@@ -230,13 +235,16 @@ router.post(
 
       if (!usuarioPrincipal) {
         return res.status(404).json({
-          message: 'No se encontró al usuario principal del trabajo social'
+          message:
+            'No se encontró al usuario principal del trabajo social'
         });
       }
 
       const correoPrincipal = String(
         usuarioPrincipal.email || ''
-      ).trim().toLowerCase();
+      )
+        .trim()
+        .toLowerCase();
 
       const codigoPrincipal = correoPrincipal.includes('@')
         ? correoPrincipal.split('@')[0]
@@ -244,13 +252,15 @@ router.post(
 
       if (!codigoPrincipal) {
         return res.status(422).json({
-          message: 'No se pudo determinar el código universitario del estudiante principal'
+          message:
+            'No se pudo determinar el código universitario del estudiante principal'
         });
       }
 
       if (codigoLimpio === codigoPrincipal) {
         return res.status(409).json({
-          message: 'El estudiante principal no puede ser agregado como integrante de su propio grupo'
+          message:
+            'El estudiante principal no puede ser agregado como integrante de su propio grupo'
         });
       }
 
@@ -258,7 +268,8 @@ router.post(
 
       if (!datos) {
         return res.status(404).json({
-          message: 'No se encontró un estudiante con el código ingresado'
+          message:
+            'No se encontró un estudiante con el código ingresado'
         });
       }
 
@@ -268,34 +279,29 @@ router.post(
 
       const correoInstitucional = String(
         datos.email || `${codigoEstudiante}@udh.edu.pe`
-      ).trim().toLowerCase();
+      )
+        .trim()
+        .toLowerCase();
 
       if (codigoEstudiante === codigoPrincipal) {
         return res.status(409).json({
-          message: 'El estudiante principal no puede ser agregado como integrante de su propio grupo'
+          message:
+            'El estudiante principal no puede ser agregado como integrante de su propio grupo'
         });
       }
 
-      const ciclo = Number(datos.ciclo);
-
-      if (!Number.isFinite(ciclo)) {
-        return res.status(422).json({
-          message: 'No se pudo determinar el ciclo académico del estudiante'
-        });
-      }
-
-      if (ciclo < 8) {
-        return res.status(422).json({
-          message: `El estudiante se encuentra en el ciclo ${ciclo}. Debe estar en 8.º ciclo o superior`
-        });
-      }
+      // Ya no se valida el ciclo académico del estudiante.
 
       const existente = await IntegranteGrupo.findOne({
         where: {
           trabajo_social_id: idTrabajo,
           [Op.or]: [
-            { codigo: codigoEstudiante },
-            { correo_institucional: correoInstitucional }
+            {
+              codigo: codigoEstudiante
+            },
+            {
+              correo_institucional: correoInstitucional
+            }
           ]
         }
       });

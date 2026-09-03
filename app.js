@@ -25,12 +25,13 @@ const Facultades = require('./models/Facultades');
 const SystemConfig = require('./models/SystemConfig');
 const Contactos = require('./models/Contactos');
 const DocumentoOficial = require('./models/DocumentoOficial');
+const trabajoSocialDomain = require('./src/domains/trabajo-social');
 
 const app = express();
 
 const corsOptions = {
-  //origin: 'http://localhost:3000',
-  origin: 'https://serviciosocial.udh.edu.pe',
+  origin: 'http://localhost:3000',
+  //origin: 'https://serviciosocial.udh.edu.pe',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
@@ -45,8 +46,8 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-        'frame-ancestors': ["'self'", 'https://serviciosocial.udh.edu.pe'],
-        //'frame-ancestors': ["'self'", 'http://localhost:3000'],
+        //'frame-ancestors': ["'self'", 'https://serviciosocial.udh.edu.pe'],
+        'frame-ancestors': ["'self'", 'http://localhost:3000'],
       },
     },
   })
@@ -80,6 +81,7 @@ app.use('/api/cronograma', require('./routes/cronograma'));
 app.use('/api/integrantes', require('./routes/integrantesGrupo'));
 app.use('/api/labores', require('./routes/laboresSociales'));
 app.use('/api/estudiantes', require('./routes/estudiantes'));
+app.use('/api/trabajo-social', trabajoSocialDomain);
 app.use('/api/trabajo-social', require('./routes/trabajoSocialSeleccionadoRoutes'));
 app.use('/api/contactos', require('./routes/contactos'));
 app.use('/api/documentos-oficiales',require('./routes/documentosOficiales'));
