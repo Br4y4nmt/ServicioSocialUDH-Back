@@ -42,20 +42,6 @@
   });
 
 
-  const storageCartaTermino = multer.diskStorage({
-    destination: function (req, file, cb) {
-      const dir = path.join(__dirname, '../uploads/cartas_termino');
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true }); 
-      }
-      cb(null, dir); 
-    },
-    filename: function (req, file, cb) {
-      const uniqueName = `carta_termino_${Date.now()}${path.extname(file.originalname)}`;
-      cb(null, uniqueName);
-    }
-  });
-
 
   const storageInformeFinal = multer.diskStorage({
     destination: function (req, file, cb) {
@@ -69,17 +55,6 @@
 
   const uploadInformeFinal = multer({
     storage: storageInformeFinal,
-    fileFilter: function (req, file, cb) {
-      const ext = path.extname(file.originalname);
-      if (ext !== '.pdf') {
-        return cb(new Error('Solo se permiten archivos PDF'));
-      }
-      cb(null, true);
-    }
-  });
-
-  const uploadCartaTermino = multer({
-    storage: storageCartaTermino,
     fileFilter: function (req, file, cb) {
       const ext = path.extname(file.originalname);
       if (ext !== '.pdf') {
@@ -441,10 +416,6 @@ router.get(
           };
         }
       );
-
-      // ==========================================
-      // RESPUESTA
-      // ==========================================
 
       return res
         .status(200)
@@ -1676,33 +1647,6 @@ router.patch(
   });
 
 
-  router.post('/guardar-carta-termino',
-    authMiddleware,
-    verificarRol('docente supervisor'),
-    uploadCartaTermino.single('archivo'),
-    async (req, res) => {
-    try {
-      const { trabajo_id } = req.body;
-
-      if (!trabajo_id || !req.file) {
-        return res.status(400).json({ message: 'Faltan datos obligatorios' });
-      }
-
-      const trabajo = await TrabajoSocialSeleccionado.findByPk(trabajo_id);
-
-      if (!trabajo) {
-        return res.status(404).json({ message: 'Trabajo no encontrado' });
-      }
-
-      await trabajo.update({ carta_termino_pdf: req.file.filename });
-
-      res.status(200).json({ message: 'Carta de término guardada correctamente', archivo: req.file.filename });
-    } catch (error) {
-      console.error('Error al guardar la carta de término:', error);
-      res.status(500).json({ message: 'Error interno al guardar carta de término', error });
-    }
-  });
-
 router.patch('/estado/:id',
   authMiddleware,
   verificarRol('docente supervisor', 'gestor-udh', 'programa-academico'),
@@ -1780,41 +1724,6 @@ router.post('/guardar-certificado-final',
   }
 });
 
-
-router.post('/guardar-carta-termino-html',
-  authMiddleware,
-  verificarRol('docente supervisor'),
-  uploadCartaTermino.single('archivo'),
-  async (req, res) => {
-  try {
-    const { trabajo_id } = req.body;
-
-    if (!trabajo_id || !req.file) {
-      return res.status(400).json({ message: 'ID de trabajo o archivo faltante' });
-    }
-
-    const trabajo = await TrabajoSocialSeleccionado.findByPk(trabajo_id);
-
-    if (!trabajo) {
-      return res.status(404).json({ message: 'Trabajo social no encontrado' });
-    }
-
-    await trabajo.update({
-      carta_termino_pdf: req.file.filename 
-    });
-
-    res.status(200).json({
-      message: 'PDF guardado correctamente en la tabla principal',
-      archivo: req.file.filename
-    });
-
-  } catch (error) {
-    console.error('Error al guardar carta de término desde frontend:', error);
-    res.status(500).json({ message: 'Error al guardar PDF', error });
-  }
-});
-
-
 router.get('/documentos-trabajo/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -1855,38 +1764,60 @@ router.get("/documento-termino/:id", async (req, res) => {
 
     let rutaPDF;
 
-    // ✅ SI VIENE CODIGO = MIEMBRO
     if (codigo) {
       const registro = await CartasTermino.findOne({
-        where: { trabajo_id: id, codigo_universitario: codigo },
+        where: {
+          trabajo_id: id,
+          codigo_universitario: codigo,
+        },
       });
 
       if (!registro?.nombre_archivo_pdf) {
-        return res.status(404).json({ message: "Carta del integrante no encontrada" });
+        return res.status(404).json({
+          message: "Carta del integrante no encontrada",
+        });
       }
 
-      rutaPDF = path.join(__dirname, "../uploads/cartas_termino", registro.nombre_archivo_pdf);
+      rutaPDF = path.join(
+        __dirname,
+        "../uploads/cartas_termino_integrantes",
+        registro.nombre_archivo_pdf
+      );
     } else {
-      // ✅ PRINCIPAL
       const trabajo = await TrabajoSocialSeleccionado.findByPk(id);
 
       if (!trabajo?.carta_termino_pdf) {
-        return res.status(404).json({ message: "Carta principal no encontrada" });
+        return res.status(404).json({
+          message: "Carta principal no encontrada",
+        });
       }
 
-      rutaPDF = path.join(__dirname, "../uploads/cartas_termino", trabajo.carta_termino_pdf);
+      rutaPDF = path.join(
+        __dirname,
+        "../uploads/cartas_termino",
+        trabajo.carta_termino_pdf
+      );
     }
 
     if (!fs.existsSync(rutaPDF)) {
-      return res.status(404).json({ message: "Archivo PDF no existe en el servidor" });
+      return res.status(404).json({
+        message: "Archivo PDF no existe en el servidor",
+      });
     }
 
-    res.setHeader("Content-Disposition", `inline; filename="Carta_Termino.pdf"`);
+    res.setHeader(
+      "Content-Disposition",
+      'inline; filename="Carta_Termino.pdf"'
+    );
     res.setHeader("Content-Type", "application/pdf");
+
     return res.sendFile(rutaPDF);
   } catch (error) {
     console.error("Error al servir carta de término:", error);
-    return res.status(500).json({ message: "Error interno al servir PDF de término" });
+
+    return res.status(500).json({
+      message: "Error interno al servir PDF de término",
+    });
   }
 });
 
@@ -2532,6 +2463,7 @@ router.delete(
     }
   }
 );
+
 router.delete(
   '/trabajos-sociales/:trabajoId',
   authMiddleware,

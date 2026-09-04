@@ -13,6 +13,8 @@ const SystemConfig = require('../../../models/SystemConfig');
 const Docentes = require('../../../models/Docentes');
 const IntegranteGrupo = require('../../../models/IntegranteGrupo');
 const CartaAceptacion = require('../../../models/CartaAceptacion');
+const CartaTermino = require('../../../models/CartaTermino');
+const CertificadoFinalMiembro = require('../../../models/CertificadoFinalMiembro');
 
 const {
   generarPlanServicioSocialPdf,
@@ -21,6 +23,14 @@ const {
 const {
   generarCartaAceptacionPdf,
 } = require('./services/cartaAceptacionPdf.service');
+
+const {
+  generarCartaTerminoPdf,
+} = require('./services/cartaTerminoPdf.service');
+
+const {
+  generarCertificadoFinalPdf,
+} = require('./services/certificadoFinalPdf.service');
 
 const healthCheck = (req, res) => {
   return res.status(200).json({
@@ -1226,9 +1236,811 @@ const aceptarDesignacion = async (req, res) => {
   }
 };
 
+
+const aprobarCartaTermino = async (req, res) => {
+  let transaction = null;
+
+  const archivosGenerados = [];
+
+  try {
+    const usuarioId =
+      req.user?.id ||
+      req.user?.id_usuario;
+
+    if (!usuarioId) {
+      throw crearError(
+        401,
+        'Usuario no autenticado'
+      );
+    }
+
+    const trabajoId = Number(
+      req.params.id
+    );
+
+    if (
+      !Number.isInteger(trabajoId) ||
+      trabajoId <= 0
+    ) {
+      throw crearError(
+        400,
+        'ID de trabajo social inválido'
+      );
+    }
+
+    const trabajo =
+      await TrabajoSocialSeleccionado.findByPk(
+        trabajoId
+      );
+
+    if (!trabajo) {
+      throw crearError(
+        404,
+        'Trabajo social no encontrado'
+      );
+    }
+
+    const docente =
+      await Docentes.findOne({
+        where: {
+          id_docente:
+            trabajo.docente_id,
+          id_usuario:
+            usuarioId,
+        },
+      });
+
+    if (!docente) {
+      throw crearError(
+        403,
+        'No tienes autorización para aprobar esta solicitud de término'
+      );
+    }
+
+    if (
+      !limpiarTexto(
+        docente.firma_digital
+      )
+    ) {
+      throw crearError(
+        400,
+        'Debes registrar tu firma digital antes de aprobar la carta de término'
+      );
+    }
+
+    if (
+      trabajo.solicitud_termino !==
+      'solicitada'
+    ) {
+      throw crearError(
+        400,
+        'No existe una solicitud de carta de término pendiente de aprobación'
+      );
+    }
+
+    const [
+      estudiante,
+      facultad,
+      programa,
+      laborSocial,
+    ] = await Promise.all([
+      Estudiantes.findOne({
+        where: {
+          id_usuario:
+            trabajo.usuario_id,
+        },
+      }),
+
+      Facultades.findByPk(
+        trabajo.facultad_id
+      ),
+
+      ProgramasAcademicos.findByPk(
+        trabajo.programa_academico_id
+      ),
+
+      LaboresSociales.findByPk(
+        trabajo.labor_social_id
+      ),
+    ]);
+
+    if (!estudiante) {
+      throw crearError(
+        404,
+        'No se encontraron los datos del estudiante'
+      );
+    }
+
+    if (!facultad) {
+      throw crearError(
+        404,
+        'No se encontró la facultad del estudiante'
+      );
+    }
+
+    if (!programa) {
+      throw crearError(
+        404,
+        'No se encontró el programa académico del estudiante'
+      );
+    }
+
+    if (!laborSocial) {
+      throw crearError(
+        404,
+        'No se encontró la labor social'
+      );
+    }
+
+    const esGrupal =
+      limpiarTexto(
+        trabajo.tipo_servicio_social
+      ).toLowerCase() === 'grupal';
+
+    let integrantes = [];
+
+    if (esGrupal) {
+      integrantes =
+        await IntegranteGrupo.findAll({
+          where: {
+            trabajo_social_id:
+              trabajo.id,
+          },
+          order: [
+            ['id_integrante', 'ASC'],
+          ],
+        });
+
+      if (
+        integrantes.length === 0
+      ) {
+        throw crearError(
+          400,
+          'El trabajo grupal no tiene integrantes registrados'
+        );
+      }
+    }
+
+    const cartasAnteriores =
+      await CartaTermino.findAll({
+        where: {
+          trabajo_id:
+            trabajo.id,
+        },
+        attributes: [
+          'nombre_archivo_pdf',
+        ],
+      });
+
+    const nombresAnteriores =
+      cartasAnteriores
+        .map(
+          (carta) =>
+            carta.nombre_archivo_pdf
+        )
+        .filter(Boolean);
+
+    if (trabajo.carta_termino_pdf) {
+      nombresAnteriores.push(
+        trabajo.carta_termino_pdf
+      );
+    }
+
+    const directorio =
+      path.join(
+        __dirname,
+        '../../../uploads/cartas_termino'
+      );
+
+    const directorioIntegrantes =
+      path.join(
+        __dirname,
+        '../../../uploads/cartas_termino_integrantes'
+      );
+
+    await Promise.all([
+      fs.mkdir(
+        directorio,
+        {
+          recursive: true,
+        }
+      ),
+
+      fs.mkdir(
+        directorioIntegrantes,
+        {
+          recursive: true,
+        }
+      ),
+    ]);
+
+    const baseUrl =
+      obtenerBaseUrl(req);
+
+    const timestamp =
+      Date.now();
+
+    const nombreCartaPrincipal =
+      `carta_termino_${trabajo.id}_${timestamp}.pdf`;
+
+    const urlPrincipal =
+      `${baseUrl}/api/trabajo-social/documento-termino/${trabajo.id}`;
+
+    const pdfPrincipal =
+      await generarCartaTerminoPdf({
+        nombreEstudiante:
+          estudiante.nombre_estudiante,
+
+        nombrePrograma:
+          programa.nombre_programa,
+
+        nombreFacultad:
+          facultad.nombre_facultad,
+
+        nombreLabor:
+          laborSocial.nombre_labores,
+
+        nombreDocente:
+          docente.nombre_docente,
+
+        firmaDigital:
+          docente.firma_digital,
+
+        urlVerificacion:
+          urlPrincipal,
+      });
+
+    const rutaPrincipal =
+      path.join(
+        directorio,
+        nombreCartaPrincipal
+      );
+
+    await fs.writeFile(
+      rutaPrincipal,
+      pdfPrincipal
+    );
+
+    archivosGenerados.push(
+      rutaPrincipal
+    );
+
+    const cartasIntegrantes = [];
+
+    if (esGrupal) {
+      for (
+        const integrante
+        of integrantes
+      ) {
+        const codigo =
+          limpiarTexto(
+            integrante.codigo
+          );
+
+        const nombreCompleto =
+          limpiarTexto(
+            integrante.nombre_completo
+          );
+
+        const nombreFacultad =
+          limpiarTexto(
+            integrante.facultad
+          );
+
+        const nombrePrograma =
+          limpiarTexto(
+            integrante.programa_academico
+          );
+
+        if (!codigo) {
+          throw crearError(
+            400,
+            'Un integrante del grupo no tiene código universitario registrado'
+          );
+        }
+
+        if (!nombreCompleto) {
+          throw crearError(
+            400,
+            `El integrante ${codigo} no tiene nombre registrado`
+          );
+        }
+
+        if (!nombreFacultad) {
+          throw crearError(
+            400,
+            `El integrante ${codigo} no tiene facultad registrada`
+          );
+        }
+
+        if (!nombrePrograma) {
+          throw crearError(
+            400,
+            `El integrante ${codigo} no tiene programa académico registrado`
+          );
+        }
+
+        const nombreArchivo =
+          `carta_termino_${trabajo.id}_${codigo}_${timestamp}.pdf`;
+
+        const urlVerificacion =
+          `${baseUrl}/api/trabajo-social/documento-termino/${trabajo.id}?codigo=${encodeURIComponent(codigo)}`;
+
+        const pdfIntegrante =
+          await generarCartaTerminoPdf({
+            nombreEstudiante:
+              nombreCompleto,
+
+            nombrePrograma,
+
+            nombreFacultad,
+
+            nombreLabor:
+              laborSocial.nombre_labores,
+
+            nombreDocente:
+              docente.nombre_docente,
+
+            firmaDigital:
+              docente.firma_digital,
+
+            urlVerificacion,
+          });
+
+          const rutaArchivo = path.join(
+            directorioIntegrantes,
+            nombreArchivo
+          );
+
+        await fs.writeFile(
+          rutaArchivo,
+          pdfIntegrante
+        );
+
+        archivosGenerados.push(
+          rutaArchivo
+        );
+
+        cartasIntegrantes.push({
+          trabajo_id:
+            trabajo.id,
+
+          codigo_universitario:
+            codigo,
+
+          nombre_archivo_pdf:
+            nombreArchivo,
+        });
+      }
+    }
+
+    transaction =
+      await sequelize.transaction();
+
+    await CartaTermino.destroy({
+      where: {
+        trabajo_id:
+          trabajo.id,
+      },
+      transaction,
+    });
+
+    if (
+      cartasIntegrantes.length > 0
+    ) {
+      await CartaTermino.bulkCreate(
+        cartasIntegrantes,
+        {
+          transaction,
+        }
+      );
+    }
+
+    await trabajo.update(
+      {
+        solicitud_termino:
+          'aprobada',
+
+        carta_termino_pdf:
+          nombreCartaPrincipal,
+      },
+      {
+        transaction,
+      }
+    );
+
+    await transaction.commit();
+
+    transaction = null;
+
+    const nuevosNombres =
+      new Set([
+        nombreCartaPrincipal,
+        ...cartasIntegrantes.map(
+          (carta) =>
+            carta.nombre_archivo_pdf
+        ),
+      ]);
+
+    const nombresAnterioresUnicos =
+      [
+        ...new Set(
+          nombresAnteriores
+        ),
+      ];
+
+    for (
+      const nombreArchivo
+      of nombresAnterioresUnicos
+    ) {
+      if (
+        nuevosNombres.has(
+          nombreArchivo
+        )
+      ) {
+        continue;
+      }
+
+      await eliminarArchivoSiExiste(
+        path.join(
+          directorio,
+          nombreArchivo
+        )
+      );
+
+      await eliminarArchivoSiExiste(
+        path.join(
+          directorioIntegrantes,
+          nombreArchivo
+        )
+      );
+    }
+
+    return res.status(200).json({
+      message:
+        'Carta de término aprobada y generada correctamente',
+
+      trabajo_id:
+        trabajo.id,
+
+      solicitud_termino:
+        'aprobada',
+
+      carta_termino_pdf:
+        nombreCartaPrincipal,
+
+      tipo_servicio_social:
+        trabajo.tipo_servicio_social,
+
+      cartas_integrantes:
+        cartasIntegrantes.length,
+    });
+  } catch (error) {
+    if (transaction) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackError) {
+        console.error(
+          'Error al revertir la transacción de carta de término:',
+          rollbackError
+        );
+      }
+    }
+
+    for (
+      const rutaArchivo
+      of archivosGenerados
+    ) {
+      await eliminarArchivoSiExiste(
+        rutaArchivo
+      );
+    }
+
+    console.error(
+      'Error al aprobar carta de término:',
+      error
+    );
+
+    return res
+      .status(error.status || 500)
+      .json({
+        message:
+          error.message ||
+          'Error al aprobar la carta de término',
+      });
+  }
+};
+
+const generarCertificadoFinal = async (req, res) => {
+  let transaction = null;
+
+  const archivosGenerados = [];
+
+  try {
+    const trabajoId = Number(req.params.id);
+
+    if (!Number.isInteger(trabajoId) || trabajoId <= 0) {
+      throw crearError(400, 'ID de trabajo social inválido');
+    }
+
+    const trabajo = await TrabajoSocialSeleccionado.findByPk(trabajoId);
+
+    if (!trabajo) {
+      throw crearError(404, 'Trabajo social no encontrado');
+    }
+
+    if (
+      limpiarTexto(trabajo.estado_informe_final).toLowerCase() !==
+      'aprobado'
+    ) {
+      throw crearError(
+        400,
+        'El informe final debe estar aprobado antes de generar el certificado'
+      );
+    }
+
+    const [estudiante, programa] = await Promise.all([
+      Estudiantes.findOne({
+        where: { id_usuario: trabajo.usuario_id },
+      }),
+
+      ProgramasAcademicos.findByPk(trabajo.programa_academico_id),
+    ]);
+
+    if (!estudiante) {
+      throw crearError(404, 'No se encontraron los datos del estudiante');
+    }
+
+    if (!programa) {
+      throw crearError(
+        404,
+        'No se encontró el programa académico del estudiante'
+      );
+    }
+
+    const esGrupal =
+      limpiarTexto(trabajo.tipo_servicio_social).toLowerCase() === 'grupal';
+
+    let integrantes = [];
+
+    if (esGrupal) {
+      integrantes = await IntegranteGrupo.findAll({
+        where: { trabajo_social_id: trabajo.id },
+        order: [['id_integrante', 'ASC']],
+      });
+    }
+
+    const certificadosAnteriores = await CertificadoFinalMiembro.findAll({
+      where: { trabajo_id: trabajo.id },
+      attributes: ['nombre_archivo_pdf'],
+    });
+
+    const nombresAnteriores = certificadosAnteriores
+      .map((c) => c.nombre_archivo_pdf)
+      .filter(Boolean);
+
+    if (trabajo.certificado_final) {
+      nombresAnteriores.push(trabajo.certificado_final);
+    }
+
+    const directorio = path.join(
+      __dirname,
+      '../../../uploads/certificados_finales'
+    );
+
+    const directorioIntegrantes = path.join(
+      __dirname,
+      '../../../uploads/certificados_finales_miembros'
+    );
+
+    await Promise.all([
+      fs.mkdir(directorio, { recursive: true }),
+      fs.mkdir(directorioIntegrantes, { recursive: true }),
+    ]);
+
+    const baseUrl = obtenerBaseUrl(req);
+    const timestamp = Date.now();
+
+    const nombreCertificadoPrincipal =
+      `certificado_final_${trabajo.id}_${timestamp}.pdf`;
+
+    const urlPrincipal =
+      `${baseUrl}/api/trabajo-social/documento-certificado-final/${trabajo.id}`;
+
+    const pdfPrincipal = await generarCertificadoFinalPdf({
+      nombreEstudiante: estudiante.nombre_estudiante,
+      nombrePrograma: programa.nombre_programa,
+      urlVerificacion: urlPrincipal,
+    });
+
+    const rutaPrincipal = path.join(directorio, nombreCertificadoPrincipal);
+
+    await fs.writeFile(rutaPrincipal, pdfPrincipal);
+
+    archivosGenerados.push(rutaPrincipal);
+
+    const certificadosIntegrantes = [];
+
+    if (esGrupal) {
+      for (const integrante of integrantes) {
+        const codigo = limpiarTexto(integrante.codigo);
+        const nombreCompleto = limpiarTexto(integrante.nombre_completo);
+        const nombrePrograma = limpiarTexto(integrante.programa_academico);
+
+        if (!codigo || !nombreCompleto || !nombrePrograma) {
+          console.warn(
+            `Integrante con datos incompletos, se omite certificado (trabajo ${trabajo.id}, codigo ${codigo || 'desconocido'})`
+          );
+          continue;
+        }
+
+        const nombreArchivo =
+          `certificado_final_${trabajo.id}_${codigo}_${timestamp}.pdf`;
+
+        const urlVerificacion =
+          `${baseUrl}/api/trabajo-social/documento-certificado-final/${trabajo.id}?codigo=${encodeURIComponent(codigo)}`;
+
+        const pdfIntegrante = await generarCertificadoFinalPdf({
+          nombreEstudiante: nombreCompleto,
+          nombrePrograma,
+          urlVerificacion,
+        });
+
+        const rutaArchivo = path.join(directorioIntegrantes, nombreArchivo);
+
+        await fs.writeFile(rutaArchivo, pdfIntegrante);
+
+        archivosGenerados.push(rutaArchivo);
+
+        certificadosIntegrantes.push({
+          trabajo_id: trabajo.id,
+          codigo_universitario: codigo,
+          nombre_archivo_pdf: nombreArchivo,
+        });
+      }
+    }
+
+    transaction = await sequelize.transaction();
+
+    await CertificadoFinalMiembro.destroy({
+      where: { trabajo_id: trabajo.id },
+      transaction,
+    });
+
+    if (certificadosIntegrantes.length > 0) {
+      await CertificadoFinalMiembro.bulkCreate(certificadosIntegrantes, {
+        transaction,
+      });
+    }
+
+    await trabajo.update(
+      { certificado_final: nombreCertificadoPrincipal },
+      { transaction }
+    );
+
+    await transaction.commit();
+
+    transaction = null;
+
+    const nuevosNombres = new Set([
+      nombreCertificadoPrincipal,
+      ...certificadosIntegrantes.map((c) => c.nombre_archivo_pdf),
+    ]);
+
+    const nombresAnterioresUnicos = [...new Set(nombresAnteriores)];
+
+    for (const nombreArchivo of nombresAnterioresUnicos) {
+      if (nuevosNombres.has(nombreArchivo)) {
+        continue;
+      }
+
+      await eliminarArchivoSiExiste(path.join(directorio, nombreArchivo));
+
+      await eliminarArchivoSiExiste(
+        path.join(directorioIntegrantes, nombreArchivo)
+      );
+    }
+
+    return res.status(200).json({
+      message: 'Certificado final generado correctamente',
+      trabajo_id: trabajo.id,
+      certificado_final: nombreCertificadoPrincipal,
+      tipo_servicio_social: trabajo.tipo_servicio_social,
+      certificados_integrantes: certificadosIntegrantes.length,
+    });
+  } catch (error) {
+    if (transaction) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackError) {
+        console.error(
+          'Error al revertir la transacción de certificado final:',
+          rollbackError
+        );
+      }
+    }
+
+    for (const rutaArchivo of archivosGenerados) {
+      await eliminarArchivoSiExiste(rutaArchivo);
+    }
+
+    console.error('Error al generar certificado final:', error);
+
+    return res.status(error.status || 500).json({
+      message: error.message || 'Error al generar el certificado final',
+    });
+  }
+};
+
+const obtenerDocumentoCertificadoFinal = async (req, res) => {
+  try {
+    const trabajoId = req.params.id;
+    const { codigo } = req.query;
+
+    let rutaPDF;
+
+    if (codigo) {
+      const registro = await CertificadoFinalMiembro.findOne({
+        where: {
+          trabajo_id: trabajoId,
+          codigo_universitario: codigo,
+        },
+      });
+
+      if (!registro?.nombre_archivo_pdf) {
+        throw crearError(
+          404,
+          'Certificado del integrante no encontrado'
+        );
+      }
+
+      rutaPDF = path.join(
+        __dirname,
+        '../../../uploads/certificados_finales_miembros',
+        registro.nombre_archivo_pdf
+      );
+    } else {
+      const trabajo = await TrabajoSocialSeleccionado.findByPk(trabajoId);
+
+      if (!trabajo?.certificado_final) {
+        throw crearError(404, 'Certificado principal no encontrado');
+      }
+
+      rutaPDF = path.join(
+        __dirname,
+        '../../../uploads/certificados_finales',
+        trabajo.certificado_final
+      );
+    }
+
+    try {
+      await fs.access(rutaPDF);
+    } catch {
+      throw crearError(404, 'Archivo PDF no existe en el servidor');
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      'inline; filename="Certificado_Final.pdf"'
+    );
+
+    return res.sendFile(rutaPDF);
+  } catch (error) {
+    console.error('Error al servir certificado final:', error);
+
+    return res.status(error.status || 500).json({
+      message: error.message || 'Error interno al servir certificado final',
+    });
+  }
+};
+
 module.exports = {
   healthCheck,
   previsualizarPlanPdf,
   guardarPlanPdf,
   aceptarDesignacion,
+  aprobarCartaTermino,
+  generarCertificadoFinal,
+  obtenerDocumentoCertificadoFinal,
 };

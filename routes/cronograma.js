@@ -1409,4 +1409,45 @@ router.get(
   }
 );
 
+router.get(
+  '/:usuario_id',
+  authMiddleware,
+  verificarRol(
+    'alumno',
+    'docente supervisor',
+    'gestor-udh',
+    'programa-academico'
+  ),
+  async (req, res) => {
+    const { usuario_id } = req.params;
+
+    try {
+      const trabajo =
+        await TrabajoSocialSeleccionado.findOne({
+          where: { usuario_id }
+        });
+
+      if (!trabajo) {
+        return res.status(404).json({
+          message: 'No encontrado'
+        });
+      }
+
+      const actividades =
+        await CronogramaActividad.findAll({
+          where: {
+            trabajo_social_id: trabajo.id
+          }
+        });
+
+      return res.json(actividades);
+    } catch (err) {
+      console.error(err);
+
+      return res.status(500).json({
+        error: 'Error al obtener cronograma'
+      });
+    }
+  }
+);
 module.exports = router;

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 0;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: "Times New Roman", Times, serif;
+      color: #000;
+      width: 297mm;
+      height: 210mm;
+    }
+
+    .pagina {
+      position: relative;
+      width: 297mm;
+      height: 210mm;
+      padding: 20mm;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background-color: #fff;
+    }
+
+    .borde-exterior {
+      position: absolute;
+      top: 7mm;
+      left: 7mm;
+      right: 7mm;
+      bottom: 7mm;
+      border: 2.2px solid #1f4e79;
+    }
+
+    .borde-interior {
+      position: absolute;
+      top: 11mm;
+      left: 11mm;
+      right: 11mm;
+      bottom: 11mm;
+      border: 1px solid #1f4e79;
+    }
+
+    .logo {
+    width: 270px;   
+    height: auto;
+    object-fit: contain;
+    margin-bottom: 6px;
+    }
+
+    .titulo-oficina {
+    font-size: 28px;
+    font-weight: normal;
+    text-align: center;
+    margin: 10px 0 6px 0;   /* antes: 0 0 6px 0 */
+    }
+
+    .separador {
+      width: 100%;
+      border-bottom: 1px solid #000;
+      margin: 6px 0 10px 0;
+    }
+
+.titulo-constancia {
+  font-size: 19px;   /* antes: 16px */
+  font-weight: bold;
+  text-align: center;
+  text-transform: uppercase;
+  margin: 8px 0 12px 0;
+}
+
+    .otorgado-a {
+    font-size: 16px;  
+    text-align: center;
+    margin: 0 0 8px 0;
+    }
+
+.nombre-estudiante {
+  font-size: 22px;  
+  font-weight: bold;
+  text-align: center;
+  text-transform: uppercase;
+  margin: 0 0 12px 0;
+}
+
+.parrafo-centro {
+  font-size: 16px;
+  text-align: center;
+  line-height: 1.5;
+  width: 92%;
+  margin: 15px 0 12px 0;   
+}
+
+.parrafo-izquierda {
+  font-size: 16px;  
+  text-align: left;
+  width: 92%;
+  margin: 0 0 14px 0;
+}
+
+.fecha-derecha {
+  width: 92%;
+  font-size: 14px;  
+  text-align: right;
+  margin: 0;
+}
+
+    .contenedor-firma {
+      margin-top: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+    }
+
+.firma-imagen {
+  width: 260px;     
+  max-height: 100px; 
+  object-fit: contain;
+}
+
+.qr-anchor {
+  position: absolute;
+  left: 20mm;
+  bottom: 16mm;   
+  display: flex;
+  align-items: center;
+  gap: 12px;     
+  width: 60%;    
+}
+
+.qr-anchor img {
+  width: 70px;    
+  height: 70px;   
+  flex-shrink: 0;
+}
+.qr-texto {
+  font-size: 9.5px;   
+  line-height: 1.3;  
+}
+  </style>
+</head>
+
+<body>
+
+  <div class="pagina">
+
+    <div class="borde-exterior"></div>
+    <div class="borde-interior"></div>
+
+    <img
+      src="{{logoDataUri}}"
+      class="logo"
+      alt="Oficina Servicio Social Universitario"
+    />
+
+    <h1 class="titulo-oficina">
+      Oficina Servicio Social Universitario
+    </h1>
+
+    <div class="separador"></div>
+
+    <p class="titulo-constancia">
+      Constancia de Conclusión del Servicio Social Universitario
+    </p>
+
+    <p class="otorgado-a">
+      Otorgado a:
+    </p>
+
+    <p class="nombre-estudiante">
+      {{nombreEstudiante}}
+    </p>
+
+    <p class="parrafo-centro">
+      del Programa Académico <strong>{{nombrePrograma}}</strong>, de la
+      Universidad de Huánuco, por haber acreditado un total de 96 horas
+      efectivas de Servicio Social Universitario.
+    </p>
+
+    <p class="parrafo-izquierda">
+      Se expide la presente constancia para los fines que correspondan.
+    </p>
+
+    <p class="fecha-derecha">
+      {{fechaExtendida}}
+    </p>
+
+    <div class="contenedor-firma">
+      <img
+        src="{{firmaDataUri}}"
+        alt="Firma institucional"
+        class="firma-imagen"
+      />
+    </div>
+
+    <div class="qr-anchor">
+      <img
+        src="{{qrDataUri}}"
+        alt="Código QR"
+      />
+
+      <div class="qr-texto">
+        <strong>Documento:</strong>
+        CONSTANCIA DE SERVICIO SOCIAL UNIVERSITARIO
+        <br />
+        <strong>URL de Verificación:</strong>
+        <br />
+        {{urlVerificacion}}
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>
